@@ -12,7 +12,13 @@ from pathlib import Path
 
 import typer
 
-from ..application.scanner import CellParser, ScanOutcome, ScanRequest, ScanService
+from ..application.scanner import (
+    CellParser,
+    ScanOutcome,
+    ScanRequest,
+    ScanService,
+    run_band_sweep,
+)
 from ..domain.enums import Band, OutputFormat
 from ..domain.exceptions import LteScannerError
 from ..infrastructure.config import AppConfig
@@ -96,6 +102,18 @@ def _format_option(value: str) -> OutputFormat:
         ) from exc
 
 
+def _render_bands(outcomes: dict[int, ScanOutcome], fmt: OutputFormat) -> str:
+    """Render band sweep results with band headers."""
+    parts: list[str] = []
+    for band, outcome in outcomes.items():
+        parts.append(f"--- Band {band} ({len(outcome.cells)} cell(s)) ---")
+        if outcome.cells:
+            parts.append(render(outcome.cells, fmt))
+        else:
+            parts.append("  No cells found.")
+    return "\n".join(parts)
+
+
 @app.command()
 def scan(
     config: Path = typer.Option(
@@ -126,6 +144,17 @@ def scan(
         "--format",
         help="Output format: table, json, csv, yaml.",
     ),
+    multi_pass: bool = typer.Option(
+        False,
+        "--multi-pass",
+        help="Enable two-pass scan: quick pass (10 frames) then deep pass (500 frames).",
+    ),
+    frames: int | None = typer.Option(
+        None,
+        "--frames",
+        "-n",
+        help="Number of frames for deep pass (default: 500). Only used with --multi-pass.",
+    ),
 ) -> None:
     """Run one LTE cell scan and render the result."""
     app_obj = build_application(config)
@@ -134,22 +163,107 @@ def scan(
     band_value = _band_option(band) if band is not None else cfg.scan.default_band
     gain_value = gain if gain is not None else cfg.scan.gain_db
     timeout_value = float(timeout) if timeout is not None else float(cfg.scan.timeout_seconds)
+    deep_frames = frames if frames is not None else cfg.scan.deep_frames
 
-    request = ScanRequest(
-        band=band_value,
-        gain_db=gain_value,
-        timeout_seconds=timeout_value,
-    )
+    if multi_pass:
+        try:
+            outcome = app_obj.scan_service.run_multi_pass(
+                band=band_value,
+                gain_db=gain_value,
+                timeout_seconds=timeout_value,
+                quick_frames=cfg.scan.quick_frames,
+                deep_frames=deep_frames,
+            )
+        except LteScannerError as exc:
+            typer.echo(f"error: {exc}", err=True)
+            raise typer.Exit(code=1) from exc
+    else:
+        request = ScanRequest(
+            band=band_value,
+            gain_db=gain_value,
+            timeout_seconds=timeout_value,
+        )
+        try:
+            outcome = app_obj.scan_service.run(request)
+        except LteScannerError as exc:
+            typer.echo(f"error: {exc}", err=True)
+            raise typer.Exit(code=1) from exc
 
     fmt = _format_option(output_format) if output_format else cfg.output.format
+    typer.echo(render(outcome.cells, fmt), err=False)
+
+
+@app.command()
+def sweep(
+    config: Path = typer.Option(
+        Path("configs/config.toml"),
+        "--config",
+        "-c",
+        help="Path to the TOML configuration file.",
+    ),
+    bands: str = typer.Option(
+        "8,5",
+        "--bands",
+        help="Comma-separated band numbers to scan sequentially (e.g. '8,5,3').",
+    ),
+    gain: float | None = typer.Option(
+        None,
+        "--gain",
+        "-g",
+        help="RF gain in dB. Defaults to config gain_db.",
+    ),
+    timeout: float | None = typer.Option(
+        None,
+        "--timeout",
+        help="Per-scan timeout in seconds. Defaults to config timeout_seconds.",
+    ),
+    output_format: str | None = typer.Option(
+        None,
+        "--format",
+        help="Output format: table, json, csv, yaml.",
+    ),
+    multi_pass: bool = typer.Option(
+        False,
+        "--multi-pass",
+        help="Enable two-pass scan per band.",
+    ),
+    frames: int | None = typer.Option(
+        None,
+        "--frames",
+        "-n",
+        help="Number of frames for deep pass (default: 500).",
+    ),
+) -> None:
+    """Scan multiple bands sequentially and display combined results."""
+    app_obj = build_application(config)
+    cfg = app_obj.config
+
+    band_list = [_band_option(b) for b in bands.split(",")]
+    gain_value = gain if gain is not None else cfg.scan.gain_db
+    timeout_value = float(timeout) if timeout is not None else float(cfg.scan.timeout_seconds)
+    deep_frames = frames if frames is not None else cfg.scan.deep_frames
+    fmt = _format_option(output_format) if output_format else cfg.output.format
+
+    typer.echo(f"Sweeping bands: {band_list}\n", err=False)
 
     try:
-        outcome: ScanOutcome = app_obj.scan_service.run(request)
+        outcomes = run_band_sweep(
+            service=app_obj.scan_service,
+            bands=band_list,
+            gain_db=gain_value,
+            timeout_seconds=timeout_value,
+            multi_pass=multi_pass,
+            quick_frames=cfg.scan.quick_frames,
+            deep_frames=deep_frames,
+            frames=frames,
+        )
     except LteScannerError as exc:
         typer.echo(f"error: {exc}", err=True)
         raise typer.Exit(code=1) from exc
 
-    typer.echo(render(outcome.cells, fmt), err=False)
+    total = sum(len(o.cells) for o in outcomes.values())
+    typer.echo(f"\nTotal cells found: {total}\n", err=False)
+    typer.echo(_render_bands(outcomes, fmt), err=False)
 
 
 @app.command("export")
@@ -167,6 +281,8 @@ def export_cmd(
     band: str | None = typer.Option(None, "--band", "-b"),
     gain: float | None = typer.Option(None, "--gain", "-g"),
     timeout: float | None = typer.Option(None, "--timeout"),
+    multi_pass: bool = typer.Option(False, "--multi-pass"),
+    frames: int | None = typer.Option(None, "--frames", "-n"),
 ) -> None:
     """Run a scan and write the result to ``destination``."""
     app_obj = build_application(config)
@@ -174,17 +290,31 @@ def export_cmd(
     band_value = _band_option(band) if band is not None else cfg.scan.default_band
     gain_value = gain if gain is not None else cfg.scan.gain_db
     timeout_value = float(timeout) if timeout is not None else float(cfg.scan.timeout_seconds)
+    deep_frames = frames if frames is not None else cfg.scan.deep_frames
 
-    request = ScanRequest(
-        band=band_value,
-        gain_db=gain_value,
-        timeout_seconds=timeout_value,
-    )
-    try:
-        outcome = app_obj.scan_service.run(request)
-    except LteScannerError as exc:
-        typer.echo(f"error: {exc}", err=True)
-        raise typer.Exit(code=1) from exc
+    if multi_pass:
+        try:
+            outcome = app_obj.scan_service.run_multi_pass(
+                band=band_value,
+                gain_db=gain_value,
+                timeout_seconds=timeout_value,
+                quick_frames=cfg.scan.quick_frames,
+                deep_frames=deep_frames,
+            )
+        except LteScannerError as exc:
+            typer.echo(f"error: {exc}", err=True)
+            raise typer.Exit(code=1) from exc
+    else:
+        request = ScanRequest(
+            band=band_value,
+            gain_db=gain_value,
+            timeout_seconds=timeout_value,
+        )
+        try:
+            outcome = app_obj.scan_service.run(request)
+        except LteScannerError as exc:
+            typer.echo(f"error: {exc}", err=True)
+            raise typer.Exit(code=1) from exc
 
     suffix = destination.suffix.lower()
     if suffix == ".json":

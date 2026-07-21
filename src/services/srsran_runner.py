@@ -46,6 +46,9 @@ def build_cell_search_args(
     *,
     band: int,
     gain_db: float = 42.0,
+    earfcn_start: int | None = None,
+    earfcn_end: int | None = None,
+    frames: int | None = None,
     extra: Sequence[str] = (),
 ) -> list[str]:
     """Compose the argv for ``lte_cell_search``.
@@ -53,17 +56,22 @@ def build_cell_search_args(
     Matches the real srsRAN CLI::
 
         cell_search -b <band> -g <gain> [-s earfcn_start] [-e earfcn_end] [-n frames]
-
-    Callers may append ``extra`` for additional flags.
     """
-    return [
+    args = [
         binary,
         "-b",
         str(band),
         "-g",
         f"{gain_db:.1f}",
-        *extra,
     ]
+    if earfcn_start is not None:
+        args.extend(["-s", str(earfcn_start)])
+    if earfcn_end is not None:
+        args.extend(["-e", str(earfcn_end)])
+    if frames is not None:
+        args.extend(["-n", str(frames)])
+    args.extend(extra)
+    return args
 
 
 class SubprocessRunner:
@@ -103,12 +111,7 @@ class SubprocessRunner:
 
 
 class SrsranRunner:
-    """High-level helper that resolves the binary path and runs srsRAN.
-
-    Pass ``binary_path=""`` to defer to ``shutil.which`` (the production
-    behaviour).  Tests can pass an existing fake binary string to skip
-    resolution entirely.
-    """
+    """High-level helper that resolves the binary path and runs srsRAN."""
 
     def __init__(
         self,
@@ -150,12 +153,18 @@ class SrsranRunner:
         band: int,
         gain_db: float,
         timeout_seconds: float,
+        earfcn_start: int | None = None,
+        earfcn_end: int | None = None,
+        frames: int | None = None,
     ) -> SrsranResult:
         binary = self.resolve_binary()
         argv = build_cell_search_args(
             binary,
             band=band,
             gain_db=gain_db,
+            earfcn_start=earfcn_start,
+            earfcn_end=earfcn_end,
+            frames=frames,
         )
         return self._runner.run(argv, timeout_seconds=timeout_seconds)
 

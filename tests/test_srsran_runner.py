@@ -53,6 +53,69 @@ def test_build_cell_search_args() -> None:
     ]
 
 
+def test_build_cell_search_args_with_earfcn_range() -> None:
+    argv = build_cell_search_args(
+        "cell_search",
+        band=8,
+        gain_db=42.0,
+        earfcn_start=100,
+        earfcn_end=200,
+    )
+    assert argv == [
+        "cell_search",
+        "-b",
+        "8",
+        "-g",
+        "42.0",
+        "-s",
+        "100",
+        "-e",
+        "200",
+    ]
+
+
+def test_build_cell_search_args_with_frames() -> None:
+    argv = build_cell_search_args(
+        "cell_search",
+        band=5,
+        gain_db=45.0,
+        frames=500,
+    )
+    assert argv == [
+        "cell_search",
+        "-b",
+        "5",
+        "-g",
+        "45.0",
+        "-n",
+        "500",
+    ]
+
+
+def test_build_cell_search_args_all_options() -> None:
+    argv = build_cell_search_args(
+        "cell_search",
+        band=8,
+        gain_db=40.0,
+        earfcn_start=100,
+        earfcn_end=200,
+        frames=50,
+    )
+    assert argv == [
+        "cell_search",
+        "-b",
+        "8",
+        "-g",
+        "40.0",
+        "-s",
+        "100",
+        "-e",
+        "200",
+        "-n",
+        "50",
+    ]
+
+
 def test_build_cell_search_args_with_extra() -> None:
     argv = build_cell_search_args(
         "cell_search",

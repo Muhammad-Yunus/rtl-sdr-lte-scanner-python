@@ -9,7 +9,7 @@
 [![Platform](https://img.shields.io/badge/Platform-Raspberry%20Pi%205-c51244)](https://www.raspberrypi.com/)
 [![srsRAN](https://img.shields.io/badge/srsRAN-4G-blue.svg)](https://www.srsran.com/)
 [![RTL-SDR](https://img.shields.io/badge/RTL--SDR-V3-orange.svg)](https://www.rtl-sdr.com/)
-[![Tests](https://img.shields.io/badge/Tests-139%20passed-brightgreen)](#testing)
+[![Tests](https://img.shields.io/badge/Tests-147%20passed-brightgreen)](#testing)
 
 <br>
 
@@ -143,7 +143,10 @@ index = 0
 [scan]
 default_band = 8
 gain_db = 42.0
-timeout_seconds = 300
+timeout_seconds = 30
+multi_pass = false
+quick_frames = 10
+deep_frames = 500
 
 [output]
 format = "table"
@@ -163,7 +166,10 @@ binary_path = "/home/pi/srsRAN_4G/build/lib/examples/cell_search"
 |-----|---------|-------------|
 | `default_band` | `8` | LTE band to scan (3, 5, 8) |
 | `gain_db` | `42.0` | RF gain in dB (40-49 optimal for R820T) |
-| `timeout_seconds` | `300` | Max scan duration per band |
+| `timeout_seconds` | `30` | Max scan duration per band |
+| `multi_pass` | `false` | Enable two-pass scan (quick → deep) |
+| `quick_frames` | `10` | Frames for quick discovery pass |
+| `deep_frames` | `500` | Frames for deep accuracy pass |
 | `binary_path` | - | Absolute path to `cell_search` binary |
 | `format` | `table` | Default output format (table/json/csv/yaml) |
 
@@ -188,6 +194,37 @@ python3 -m src.cli.main scan --band 8 --format json
 
 # Scan with longer timeout
 python3 -m src.cli.main scan --band 8 --timeout 600
+```
+
+### Multi-pass scan
+
+Two-pass scan: quick discovery (10 frames) then deep accuracy scan (500 frames).
+Faster than full deep scan while still getting accurate RSRP measurements.
+
+```bash
+# Multi-pass scan on Band 8
+python3 -m src.cli.main scan --band 8 --multi-pass
+
+# Multi-pass with custom deep frames
+python3 -m src.cli.main scan --band 8 --multi-pass --frames 1000
+```
+
+### Band sweep
+
+Scan multiple bands sequentially in one command.
+
+```bash
+# Sweep Band 8 and 5 (default)
+python3 -m src.cli.main sweep
+
+# Sweep specific bands
+python3 -m src.cli.main sweep --bands 8,5,3
+
+# Sweep with multi-pass per band
+python3 -m src.cli.main sweep --bands 8,5 --multi-pass
+
+# Sweep with JSON output
+python3 -m src.cli.main sweep --bands 8,5 --format json
 ```
 
 ### Export results
@@ -334,12 +371,13 @@ rtl-sdr-lte-scanner-python/
 ├── configs/
 │   └── config.toml                # Runtime configuration
 ├── data/
-│   └── operators.json             # MCC/MNC → operator lookup
+│   ├── operators.json             # MCC/MNC → operator lookup
+│   └── frequency_band_map.json    # EARFCN → operator spectrum mapping
 ├── src/
 │   ├── cli/
 │   │   └── main.py                # Typer CLI entry point
 │   ├── application/
-│   │   └── scanner.py             # ScanService workflow coordinator
+│   │   └── scanner.py             # ScanService + multi-pass + band sweep
 │   ├── domain/
 │   │   ├── models.py              # LTECell, OperatorEntry dataclasses
 │   │   ├── enums.py               # Band, BandwidthMHz, OutputFormat
@@ -347,7 +385,7 @@ rtl-sdr-lte-scanner-python/
 │   ├── services/
 │   │   ├── srsran_runner.py       # Subprocess wrapper for cell_search
 │   │   ├── cell_parser.py         # Regex parser for srsRAN output
-│   │   ├── operator_resolver.py   # MCC/MNC enrichment
+│   │   ├── operator_resolver.py   # MCC/MNC + EARFCN enrichment
 │   │   ├── formatter.py           # Table/JSON/CSV/YAML renderers
 │   │   └── exporter.py            # File writer
 │   ├── infrastructure/
@@ -355,16 +393,17 @@ rtl-sdr-lte-scanner-python/
 │   │   ├── logger.py              # Python logging setup
 │   │   └── filesystem.py          # File/dir helpers
 │   ├── repository/
-│   │   └── operator_db.py         # Operator database loader
+│   │   ├── operator_db.py         # Operator database loader
+│   │   └── frequency_band_db.py   # Frequency band map loader
 │   └── utils/
 │       ├── frequency.py           # EARFCN ↔ MHz converter
 │       └── validation.py          # Input validators
 ├── tests/
 │   ├── test_cell_parser.py        # Parser tests (17 cases)
 │   ├── test_cli.py                # CLI integration tests
-│   ├── test_scanner.py            # ScanService tests
+│   ├── test_scanner.py            # ScanService + multi-pass + sweep tests
 │   ├── test_srsran_runner.py      # Runner tests
-│   └── ...                        # 139 tests total
+│   └── ...                        # 147 tests total
 ├── pyproject.toml                 # Project config & dependencies
 └── README.md
 ```
@@ -412,7 +451,7 @@ python3 -m pytest tests/ --cov=src --cov-report=term-missing
 python3 -m pytest tests/test_cell_parser.py -v
 ```
 
-All **139 tests** pass on Raspberry Pi 5.
+All **147 tests** pass on Raspberry Pi 5.
 
 ---
 
@@ -490,9 +529,10 @@ binary_path = "/home/pi/srsRAN_4G/build/lib/examples/cell_search"
 - [x] Operator enrichment (MCC/MNC)
 - [x] Multi-format output (table, JSON, CSV, YAML)
 - [x] CLI with Typer
+- [x] Multi-pass scan (quick → deep)
+- [x] Multi-band sweep
 - [ ] MIB/SIB decoder for Cell ID, TAC, MCC, MNC
 - [ ] Continuous monitoring mode
-- [ ] Multi-band sweep
 - [ ] SQLite result database
 - [ ] Neighbor cell tracking
 - [ ] Spectrum occupancy stats

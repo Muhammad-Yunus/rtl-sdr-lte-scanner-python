@@ -36,6 +36,9 @@ class ScanConfig(BaseModel):
     timeout_seconds: int = Field(30, gt=0)
     retry_count: int = Field(0, ge=0)
     allowed_bands: list[int] = Field(default_factory=list)
+    multi_pass: bool = False
+    quick_frames: int = Field(10, ge=1)
+    deep_frames: int = Field(500, ge=1)
 
     @field_validator("default_frequency_mhz")
     @classmethod

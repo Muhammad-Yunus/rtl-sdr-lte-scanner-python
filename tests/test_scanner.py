@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from src.application.scanner import ScanRequest, ScanService
+from src.application.scanner import ScanRequest, ScanService, run_band_sweep
 from src.domain.enums import Band, BandwidthMHz
 from src.domain.models import LTECell
 from src.repository.operator_db import OperatorDatabase
@@ -135,3 +135,125 @@ def test_run_invokes_runner_with_correct_request() -> None:
     call = fake.calls[0]
     assert call["timeout"] == 42.0
     assert call["command"][0] == "/fake/srsran"
+
+
+def test_run_passes_earfcn_range_and_frames() -> None:
+    fake = _FakeRunner()
+    service = _make_service(fake, [])
+    req = ScanRequest(
+        band=8,
+        gain_db=42.0,
+        timeout_seconds=10.0,
+        earfcn_start=100,
+        earfcn_end=200,
+        frames=50,
+    )
+    service.run(req)
+    cmd = fake.calls[0]["command"]
+    assert "-s" in cmd
+    assert "100" in cmd
+    assert "-e" in cmd
+    assert "200" in cmd
+    assert "-n" in cmd
+    assert "50" in cmd
+
+
+def test_multi_pass_short_circuits_when_no_cells_found() -> None:
+    fake = _FakeRunner()
+    service = _make_service(fake, [])
+    outcome = service.run_multi_pass(
+        band=8,
+        gain_db=42.0,
+        timeout_seconds=10.0,
+        quick_frames=10,
+        deep_frames=500,
+    )
+    assert outcome.cells == []
+    assert len(fake.calls) == 1, "should stop after pass 1, no pass 2"
+
+
+def test_multi_pass_runs_deep_scan_when_cells_found() -> None:
+    cells = [
+        LTECell(
+            frequency_mhz=869.5,
+            earfcn=2405,
+            band=Band.BAND_5,
+            bandwidth_mhz=BandwidthMHz.BW_10,
+            pci=1,
+            cell_id=1,
+            tac=1,
+            mcc=510,
+            mnc=10,
+        )
+    ]
+    fake = _FakeRunner()
+    service = _make_service(fake, cells)
+    outcome = service.run_multi_pass(
+        band=5,
+        gain_db=42.0,
+        timeout_seconds=10.0,
+        quick_frames=10,
+        deep_frames=500,
+    )
+    assert len(fake.calls) == 2, "should run both pass 1 and pass 2"
+    assert len(outcome.cells) == 1
+    assert outcome.cells[0].operator == "Telkomsel"
+    pass1_cmd = fake.calls[0]["command"]
+    pass2_cmd = fake.calls[1]["command"]
+    assert "-n" in pass1_cmd
+    assert pass1_cmd[pass1_cmd.index("-n") + 1] == "10"
+    assert "-n" in pass2_cmd
+    assert pass2_cmd[pass2_cmd.index("-n") + 1] == "500"
+
+
+def test_band_sweep_returns_outcome_per_band() -> None:
+    cells = [
+        LTECell(
+            frequency_mhz=869.5,
+            earfcn=2405,
+            band=Band.BAND_5,
+            bandwidth_mhz=BandwidthMHz.BW_10,
+            pci=1,
+            cell_id=1,
+            tac=1,
+            mcc=510,
+            mnc=10,
+        )
+    ]
+    fake = _FakeRunner()
+    service = _make_service(fake, cells)
+    outcomes = run_band_sweep(
+        service=service,
+        bands=[8, 5],
+        gain_db=42.0,
+        timeout_seconds=10.0,
+    )
+    assert 8 in outcomes
+    assert 5 in outcomes
+    assert len(outcomes[5].cells) == 1
+    assert outcomes[5].cells[0].operator == "Telkomsel"
+
+
+def test_band_sweep_with_multi_pass() -> None:
+    cells = [
+        LTECell(
+            frequency_mhz=925.0,
+            earfcn=100,
+            band=Band.BAND_8,
+            bandwidth_mhz=BandwidthMHz.BW_10,
+            pci=1,
+        )
+    ]
+    fake = _FakeRunner()
+    service = _make_service(fake, cells)
+    outcomes = run_band_sweep(
+        service=service,
+        bands=[8],
+        gain_db=42.0,
+        timeout_seconds=10.0,
+        multi_pass=True,
+        quick_frames=10,
+        deep_frames=500,
+    )
+    assert 8 in outcomes
+    assert len(fake.calls) == 2, "multi-pass should call runner twice per band"

@@ -102,7 +102,7 @@ def test_scan_with_pending_parser_emits_table(monkeypatch: pytest.MonkeyPatch) -
                 )
             ]
 
-    def _fake_run(self, *, band, gain_db, timeout_seconds):
+    def _fake_run(self, *, band, gain_db, timeout_seconds, earfcn_start=None, earfcn_end=None, frames=None):
         return SrsranResult(
             returncode=0,
             stdout="raw",

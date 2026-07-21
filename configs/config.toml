@@ -18,6 +18,12 @@ timeout_seconds = 30
 retry_count = 2
 # Bands permitted when --band is omitted. Empty list = caller chooses.
 allowed_bands = []
+# Multi-pass scan: quick pass then deep pass.
+multi_pass = false
+# Frames for the quick discovery pass (lower = faster).
+quick_frames = 10
+# Frames for the deep accuracy pass (higher = better RSRP).
+deep_frames = 500
 
 [output]
 # One of: table, json, csv, yaml
