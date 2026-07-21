@@ -3,6 +3,8 @@ index = 1
 
 [scan]
 default_frequency_mhz = 942.5
+default_band = 8
+gain_db = 42.0
 timeout_seconds = 45
 retry_count = 1
 allowed_bands = [3, 5, 8]

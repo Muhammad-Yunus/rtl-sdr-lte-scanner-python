@@ -7,8 +7,8 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-from src.cli.main import _band_option, _bandwidth_option, _format_option, app
-from src.domain.enums import BandwidthMHz, OutputFormat
+from src.cli.main import _band_option, _format_option, app
+from src.domain.enums import OutputFormat
 
 FIXTURE_CONFIG = Path("tests/fixtures/config.toml")
 runner = CliRunner()
@@ -49,6 +49,8 @@ def test_scan_with_unknown_dongle_shows_error(
                 index = 0
                 [scan]
                 default_frequency_mhz = 869.5
+                default_band = 8
+                gain_db = 42.0
                 timeout_seconds = 1
                 retry_count = 0
                 [output]
@@ -100,12 +102,12 @@ def test_scan_with_pending_parser_emits_table(monkeypatch: pytest.MonkeyPatch) -
                 )
             ]
 
-    def _fake_run(self, *, frequency_mhz, bandwidth, device_index, timeout_seconds):
+    def _fake_run(self, *, band, gain_db, timeout_seconds):
         return SrsranResult(
             returncode=0,
             stdout="raw",
             stderr="",
-            command=("srsran", "cell_search"),
+            command=("cell_search", "-b", "8"),
         )
 
     monkeypatch.setattr(
@@ -128,6 +130,8 @@ def test_scan_with_pending_parser_emits_table(monkeypatch: pytest.MonkeyPatch) -
 index = 0
 [scan]
 default_frequency_mhz = 869.5
+default_band = 8
+gain_db = 42.0
 timeout_seconds = 1
 retry_count = 0
 [output]
@@ -156,9 +160,9 @@ binary_path = ""
 
 def test_export_writes_file(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """End-to-end-ish: parser provides a cell, exporter writes JSON."""
+    from src.application.scanner import ScanOutcome
     from src.domain.enums import Band, BandwidthMHz
     from src.domain.models import LTECell
-    from src.application.scanner import ScanOutcome
 
     monkeypatch.setattr(
         "src.application.scanner.ScanService.run",
@@ -182,7 +186,6 @@ def test_export_writes_file(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> 
     data_dir.mkdir()
     shutil.copy2(Path("data/operators.json"), data_dir / "operators.json")
     config = tmp_path / "cfg.toml"
-    # Normalise to forward slashes so backslashes in tmp path don't trip up TOML parsing.
     export_dir = (tmp_path / "exports").as_posix()
     config.write_text(
         f"""
@@ -190,6 +193,8 @@ def test_export_writes_file(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> 
 index = 0
 [scan]
 default_frequency_mhz = 869.5
+default_band = 8
+gain_db = 42.0
 timeout_seconds = 1
 retry_count = 0
 [output]
@@ -220,7 +225,6 @@ binary_path = ""
         os.chdir(cwd)
     assert result.exit_code == 0, (result.stdout or "") + (result.stderr or "")
     assert "Wrote" in result.stdout
-    # The export path was "$tmp_path/exports/result.json"
     exported = tmp_path / "exports" / "result.json"
     assert exported.exists()
     assert "869.5" in exported.read_text(encoding="utf-8")
@@ -230,6 +234,8 @@ def test_export_rejects_unknown_suffix(tmp_path: Path) -> None:
     config = tmp_path / "cfg.toml"
     config.write_text("""[scan]
 default_frequency_mhz = 869.5
+default_band = 8
+gain_db = 42.0
 timeout_seconds = 1
 """, encoding="utf-8")
     result = runner.invoke(
@@ -240,19 +246,6 @@ timeout_seconds = 1
 
 
 # ---- option helpers ----------------------------------------------------------
-
-
-def test_bandwidth_option_accepts_integer_and_string() -> None:
-    assert _bandwidth_option("10") is BandwidthMHz.BW_10
-    assert _bandwidth_option("10MHz") is BandwidthMHz.BW_10
-    assert _bandwidth_option("20 mhz") is BandwidthMHz.BW_20
-
-
-def test_bandwidth_option_rejects_unknown() -> None:
-    import typer
-
-    with pytest.raises(typer.BadParameter, match="Unsupported bandwidth"):
-        _bandwidth_option("42")
 
 
 def test_band_option_accepts_known_band() -> None:

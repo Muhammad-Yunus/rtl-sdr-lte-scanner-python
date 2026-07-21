@@ -15,7 +15,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Protocol
 
-from ..domain.enums import BandwidthMHz
 from ..domain.models import LTECell
 from ..services.operator_resolver import OperatorResolver
 from ..services.srsran_runner import SrsranResult, SrsranRunner
@@ -31,9 +30,8 @@ class CellParser(Protocol):
 class ScanRequest:
     """User intent for one scan run."""
 
-    frequency_mhz: float
-    bandwidth: BandwidthMHz
-    device_index: int
+    band: int
+    gain_db: float
     timeout_seconds: float
 
 
@@ -62,9 +60,8 @@ class ScanService:
 
     def run(self, request: ScanRequest) -> ScanOutcome:
         result: SrsranResult = self._runner.run_cell_search(
-            frequency_mhz=request.frequency_mhz,
-            bandwidth=request.bandwidth,
-            device_index=request.device_index,
+            band=request.band,
+            gain_db=request.gain_db,
             timeout_seconds=request.timeout_seconds,
         )
         cells = self._parser.parse(result.stdout)

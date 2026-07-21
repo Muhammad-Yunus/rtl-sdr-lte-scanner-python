@@ -1,12 +1,11 @@
 """Subprocess wrapper around the srsRAN binary.
 
-This module does *not* interpret srsRAN output. Its job is to launch the
+This module does *not* interpret srsRAN output.  Its job is to launch the
 process with the right arguments and capture stdout/stderr for the parser
 to consume later.
 
-Argument construction lives in :func:`build_cell_search_args` so it can be
-swapped without touching process management once the real srsRAN CLI is
-known.
+The ``cell_search`` binary accepts ``-b <band>``, ``-g <gain>``,
+``-s <earfcn_start>``, ``-e <earfcn_end>``, ``-n <frames>`` flags.
 """
 
 from __future__ import annotations
@@ -17,7 +16,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Mapping, Protocol, Sequence
 
-from ..domain.enums import BandwidthMHz
 from ..domain.exceptions import ScanTimeoutError, SrsranMissingError
 
 
@@ -46,26 +44,24 @@ class ProcessRunner(Protocol):
 def build_cell_search_args(
     binary: str,
     *,
-    frequency_mhz: float,
-    bandwidth: BandwidthMHz,
-    device_index: int,
+    band: int,
+    gain_db: float = 42.0,
     extra: Sequence[str] = (),
 ) -> list[str]:
-    """Compose the argv for an srsRAN cell-search invocation.
+    """Compose the argv for ``lte_cell_search``.
 
-    The exact flag set is intentionally generic; callers may append
-    ``extra`` for vendor-specific flags. Update this function once the real
-    srsRAN CLI is wired up against a real device.
+    Matches the real srsRAN CLI::
+
+        cell_search -b <band> -g <gain> [-s earfcn_start] [-e earfcn_end] [-n frames]
+
+    Callers may append ``extra`` for additional flags.
     """
     return [
         binary,
-        "cell_search",
-        "--freq",
-        f"{frequency_mhz:.3f}",
-        "--bw",
-        str(int(bandwidth.value)),
-        "--device",
-        str(device_index),
+        "-b",
+        str(band),
+        "-g",
+        f"{gain_db:.1f}",
         *extra,
     ]
 
@@ -110,7 +106,7 @@ class SrsranRunner:
     """High-level helper that resolves the binary path and runs srsRAN.
 
     Pass ``binary_path=""`` to defer to ``shutil.which`` (the production
-    behaviour). Tests can pass an existing fake binary string to skip
+    behaviour).  Tests can pass an existing fake binary string to skip
     resolution entirely.
     """
 
@@ -123,8 +119,6 @@ class SrsranRunner:
     ) -> None:
         self._configured_binary = configured_binary
         self._runner = process_runner
-        # When True, ``resolve_binary`` skips existence/PATH lookup and
-        # uses ``configured_binary`` verbatim. Intended for tests.
         self._trust_resolved_binary = trust_resolved_binary
 
     def resolve_binary(self) -> str:
@@ -153,26 +147,20 @@ class SrsranRunner:
     def run_cell_search(
         self,
         *,
-        frequency_mhz: float,
-        bandwidth: BandwidthMHz,
-        device_index: int,
+        band: int,
+        gain_db: float,
         timeout_seconds: float,
     ) -> SrsranResult:
         binary = self.resolve_binary()
         argv = build_cell_search_args(
             binary,
-            frequency_mhz=frequency_mhz,
-            bandwidth=bandwidth,
-            device_index=device_index,
+            band=band,
+            gain_db=gain_db,
         )
         return self._runner.run(argv, timeout_seconds=timeout_seconds)
 
     def with_resolved_binary(self, binary: str) -> "SrsranRunner":
-        """Return a copy that uses ``binary`` directly, skipping PATH lookup.
-
-        Intended for tests and for callers that have already verified the
-        binary location out-of-band.
-        """
+        """Return a copy that uses ``binary`` directly, skipping PATH lookup."""
         clone = SrsranRunner(self._configured_binary, self._runner)
         object.__setattr__(clone, "_configured_binary", Path(binary))
         object.__setattr__(clone, "_trust_resolved_binary", True)
@@ -180,7 +168,6 @@ class SrsranRunner:
 
 
 __all__ = [
-    "BandwidthMHz",
     "ProcessRunner",
     "SrsranResult",
     "SrsranRunner",

@@ -22,6 +22,10 @@ class LTECell:
     """A single LTE cell as parsed from srsRAN output.
 
     Immutable; use `dataclasses.replace` to derive a variant.
+
+    Fields ``cell_id``, ``tac``, ``mcc``, and ``mnc`` are ``None`` when the
+    value is not available from the srsRAN cell-search output.  They may be
+    populated by a future MIB/SIB decoder or an external data source.
     """
 
     frequency_mhz: float
@@ -29,10 +33,10 @@ class LTECell:
     band: Band
     bandwidth_mhz: BandwidthMHz
     pci: int
-    cell_id: int
-    tac: int
-    mcc: int
-    mnc: int
+    cell_id: Optional[int] = None
+    tac: Optional[int] = None
+    mcc: Optional[int] = None
+    mnc: Optional[int] = None
     rsrp: Optional[int] = None
     rsrq: Optional[int] = None
     snr: Optional[int] = None

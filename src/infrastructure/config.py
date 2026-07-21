@@ -31,6 +31,8 @@ class ScanConfig(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     default_frequency_mhz: float = 869.5
+    default_band: int = Field(8, ge=1, le=100)
+    gain_db: float = Field(42.0, ge=0.0, le=49.0)
     timeout_seconds: int = Field(30, gt=0)
     retry_count: int = Field(0, ge=0)
     allowed_bands: list[int] = Field(default_factory=list)

@@ -1,7 +1,7 @@
 """Command-line entry point for ``lte-scan``.
 
 The CLI is intentionally thin: it parses arguments, builds dependencies from
-configuration, calls the application layer, and renders results. It does
+configuration, calls the application layer, and renders results.  It does
 *not* parse LTE output or run subprocesses itself.
 """
 
@@ -9,17 +9,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 
 import typer
 
 from ..application.scanner import CellParser, ScanOutcome, ScanRequest, ScanService
-from ..domain.enums import Band, BandwidthMHz, OutputFormat
+from ..domain.enums import Band, OutputFormat
 from ..domain.exceptions import LteScannerError
-from ..domain.models import LTECell
 from ..infrastructure.config import AppConfig
 from ..infrastructure.logger import configure_logging
 from ..repository.operator_db import OperatorDatabase
+from ..services.cell_parser import SrsranCellParser
 from ..services.exporter import ScanExporter
 from ..services.formatter import render
 from ..services.operator_resolver import OperatorResolver
@@ -49,12 +48,7 @@ def build_application(
     parser: CellParser | None = None,
     runner: SubprocessRunner | None = None,
 ) -> Application:
-    """Construct the wired graph from a config file.
-
-    Both ``parser`` and ``runner`` are injectable so tests can substitute
-    them. ``parser`` defaults to a placeholder until the real srsRAN parser
-    lands — see :class:`PendingParser`.
-    """
+    """Construct the wired graph from a config file."""
     config = AppConfig.from_toml(config_path)
     configure_logging(config.logging.level, config.logging.file)
 
@@ -64,7 +58,7 @@ def build_application(
     srsran_runner = __import__(
         "src.services.srsran_runner", fromlist=["SrsranRunner"]
     ).SrsranRunner(config.srsran.binary_path, runner_impl)
-    parser_impl: CellParser = parser or PendingParser()
+    parser_impl: CellParser = parser or SrsranCellParser()
 
     scan_service = ScanService(
         runner=srsran_runner,
@@ -73,35 +67,6 @@ def build_application(
     )
     exporter = ScanExporter(config.output.export_dir)
     return Application(config=config, scan_service=scan_service, exporter=exporter)
-
-
-class PendingParser:
-    """Stub parser used until the real srsRAN parser is implemented.
-
-    Returning an empty list keeps the CLI functional for ``--help`` and
-    configuration checks without lying about scan results.
-    """
-
-    def parse(self, stdout: str) -> list[LTECell]:  # pragma: no cover - trivial
-        return []
-
-
-def _bandwidth_option(value: str) -> BandwidthMHz:
-    """Parse ``--bw`` strings like ``"10"`` or ``"10MHz"``."""
-    cleaned = value.strip().lower().replace("mhz", "").strip()
-    try:
-        bw_value = int(cleaned)
-    except ValueError as exc:
-        raise typer.BadParameter(
-            f"Bandwidth must be an integer MHz value, got {value!r}."
-        ) from exc
-    for member in BandwidthMHz:
-        if int(member.value) == bw_value:
-            return member
-    raise typer.BadParameter(
-        f"Unsupported bandwidth: {bw_value} MHz. Choose one of "
-        f"{[int(m.value) for m in BandwidthMHz]} MHz."
-    )
 
 
 def _band_option(value: str) -> int:
@@ -136,32 +101,24 @@ def scan(
         "-c",
         help="Path to the TOML configuration file.",
     ),
-    freq: Optional[float] = typer.Option(
-        None,
-        "--freq",
-        help="Central frequency in MHz. Defaults to [scan].default_frequency_mhz.",
-    ),
-    bw: Optional[str] = typer.Option(
-        None,
-        "--bw",
-        help="Channel bandwidth (e.g. '10' or '10MHz'). Defaults to 10 MHz.",
-    ),
-    band: Optional[str] = typer.Option(
+    band: str | None = typer.Option(
         None,
         "--band",
-        help="LTE band number (e.g. '5'). Informational only at this stage.",
+        "-b",
+        help="LTE band number to scan (e.g. '5', '8'). Defaults to config default_band.",
     ),
-    device: Optional[int] = typer.Option(
+    gain: float | None = typer.Option(
         None,
-        "--device",
-        help="RTL-SDR device index. Defaults to [device].index.",
+        "--gain",
+        "-g",
+        help="RF gain in dB (40-49 recommended for RTL-SDR). Defaults to config gain_db.",
     ),
-    timeout: Optional[float] = typer.Option(
+    timeout: float | None = typer.Option(
         None,
         "--timeout",
         help="Per-scan timeout in seconds. Defaults to [scan].timeout_seconds.",
     ),
-    output_format: Optional[str] = typer.Option(
+    output_format: str | None = typer.Option(
         None,
         "--format",
         help="Output format: table, json, csv, yaml.",
@@ -171,17 +128,17 @@ def scan(
     app_obj = build_application(config)
     cfg = app_obj.config
 
-    bandwidth = _bandwidth_option(bw) if bw else BandwidthMHz.BW_10
+    band_value = _band_option(band) if band is not None else cfg.scan.default_band
+    gain_value = gain if gain is not None else cfg.scan.gain_db
+    timeout_value = float(timeout) if timeout is not None else float(cfg.scan.timeout_seconds)
+
     request = ScanRequest(
-        frequency_mhz=float(freq) if freq is not None else cfg.scan.default_frequency_mhz,
-        bandwidth=bandwidth,
-        device_index=int(device) if device is not None else cfg.device.index,
-        timeout_seconds=float(timeout) if timeout is not None else float(cfg.scan.timeout_seconds),
+        band=band_value,
+        gain_db=gain_value,
+        timeout_seconds=timeout_value,
     )
 
     fmt = _format_option(output_format) if output_format else cfg.output.format
-    if band is not None:
-        _ = _band_option(band)  # validates input; value is informational only
 
     try:
         outcome: ScanOutcome = app_obj.scan_service.run(request)
@@ -204,20 +161,21 @@ def export_cmd(
         ...,
         help="Destination filename (suffix determines format: .json or .csv).",
     ),
-    freq: Optional[float] = typer.Option(None, "--freq"),
-    bw: Optional[str] = typer.Option(None, "--bw"),
-    device: Optional[int] = typer.Option(None, "--device"),
-    timeout: Optional[float] = typer.Option(None, "--timeout"),
+    band: str | None = typer.Option(None, "--band", "-b"),
+    gain: float | None = typer.Option(None, "--gain", "-g"),
+    timeout: float | None = typer.Option(None, "--timeout"),
 ) -> None:
     """Run a scan and write the result to ``destination``."""
     app_obj = build_application(config)
     cfg = app_obj.config
-    bandwidth = _bandwidth_option(bw) if bw else BandwidthMHz.BW_10
+    band_value = _band_option(band) if band is not None else cfg.scan.default_band
+    gain_value = gain if gain is not None else cfg.scan.gain_db
+    timeout_value = float(timeout) if timeout is not None else float(cfg.scan.timeout_seconds)
+
     request = ScanRequest(
-        frequency_mhz=float(freq) if freq is not None else cfg.scan.default_frequency_mhz,
-        bandwidth=bandwidth,
-        device_index=int(device) if device is not None else cfg.device.index,
-        timeout_seconds=float(timeout) if timeout is not None else float(cfg.scan.timeout_seconds),
+        band=band_value,
+        gain_db=gain_value,
+        timeout_seconds=timeout_value,
     )
     try:
         outcome = app_obj.scan_service.run(request)

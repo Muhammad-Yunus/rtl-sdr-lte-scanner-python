@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 from src.application.scanner import ScanRequest, ScanService
@@ -35,7 +34,6 @@ class _FakeRunner:
         self.calls: list[dict] = []
 
     def run(self, command, *, timeout_seconds, env=None):
-        # The runner stores the command we built; we don't introspect it here.
         self.calls.append(
             {
                 "command": tuple(command),
@@ -60,9 +58,8 @@ def _make_service(runner, cells):
 
 def _request() -> ScanRequest:
     return ScanRequest(
-        frequency_mhz=869.5,
-        bandwidth=BandwidthMHz.BW_10,
-        device_index=0,
+        band=5,
+        gain_db=42.0,
         timeout_seconds=10.0,
     )
 
@@ -129,13 +126,12 @@ def test_run_invokes_runner_with_correct_request() -> None:
     fake = _FakeRunner()
     service = _make_service(fake, [])
     req = ScanRequest(
-        frequency_mhz=1800.0,
-        bandwidth=BandwidthMHz.BW_20,
-        device_index=1,
+        band=8,
+        gain_db=45.0,
         timeout_seconds=42.0,
     )
     service.run(req)
     assert fake.calls, "runner should have been called"
     call = fake.calls[0]
     assert call["timeout"] == 42.0
-    assert call["command"][0].endswith("fake" + os.sep + "srsran") or call["command"][0] == "/fake/srsran"
+    assert call["command"][0] == "/fake/srsran"

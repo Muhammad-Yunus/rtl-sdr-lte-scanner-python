@@ -6,8 +6,12 @@
 index = 0
 
 [scan]
-# Default central frequency in MHz when --freq is not provided.
+# Default band to scan when --band is not provided.
+default_band = 8
+# Default central frequency in MHz (informational, used for display).
 default_frequency_mhz = 869.5
+# RF gain in dB. 40-49 recommended for RTL-SDR R820T.
+gain_db = 42.0
 # Per-scan timeout in seconds.
 timeout_seconds = 30
 # Number of retries when srsRAN exits without producing cells.
@@ -28,5 +32,5 @@ level = "INFO"
 file = ""
 
 [srsran]
-# Path to the srsRAN binary. Leave empty to rely on PATH lookup.
-binary_path = ""
+# Path to the srsRAN cell_search binary.
+binary_path = "/home/pi/srsRAN_4G/build/lib/examples/cell_search"

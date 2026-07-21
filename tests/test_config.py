@@ -17,6 +17,8 @@ def test_load_fixture_matches_values() -> None:
     cfg = AppConfig.from_toml(FIXTURE)
     assert cfg.device.index == 1
     assert cfg.scan.default_frequency_mhz == 942.5
+    assert cfg.scan.default_band == 8
+    assert cfg.scan.gain_db == 42.0
     assert cfg.scan.timeout_seconds == 45
     assert cfg.scan.retry_count == 1
     assert cfg.scan.allowed_bands == [3, 5, 8]
@@ -28,6 +30,9 @@ def test_load_real_project_config() -> None:
     cfg = AppConfig.from_toml(Path("configs/config.toml"))
     assert cfg.device.index == 0
     assert cfg.scan.default_frequency_mhz == 869.5
+    assert cfg.scan.default_band == 8
+    assert cfg.scan.gain_db == 42.0
+    assert cfg.srsran.binary_path == Path("/home/pi/srsRAN_4G/build/lib/examples/cell_search")
 
 
 def test_missing_file_raises_config_error(tmp_path: Path) -> None:

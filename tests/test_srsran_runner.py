@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Mapping, Sequence
 
 import pytest
 
-from src.domain.enums import BandwidthMHz
 from src.domain.exceptions import ScanTimeoutError, SrsranMissingError
 from src.services.srsran_runner import (
     SrsranResult,
@@ -41,30 +40,37 @@ class _FakeRunner:
 
 def test_build_cell_search_args() -> None:
     argv = build_cell_search_args(
-        "/usr/bin/srsran",
-        frequency_mhz=869.530,
-        bandwidth=BandwidthMHz.BW_10,
-        device_index=0,
+        "/home/pi/srsRAN_4G/build/lib/examples/cell_search",
+        band=8,
+        gain_db=42.0,
     )
     assert argv == [
-        "/usr/bin/srsran",
-        "cell_search",
-        "--freq", "869.530",
-        "--bw", "10",
-        "--device", "0",
+        "/home/pi/srsRAN_4G/build/lib/examples/cell_search",
+        "-b",
+        "8",
+        "-g",
+        "42.0",
     ]
 
 
 def test_build_cell_search_args_with_extra() -> None:
     argv = build_cell_search_args(
-        "srsran",
-        frequency_mhz=1800.0,
-        bandwidth=BandwidthMHz.BW_20,
-        device_index=1,
-        extra=["--verbose", "--rf"],
+        "cell_search",
+        band=5,
+        gain_db=45.5,
+        extra=["-s", "2400", "-e", "2649"],
     )
-    assert argv[-2:] == ["--verbose", "--rf"]
-    assert argv[3] == "1800.000"
+    assert argv == [
+        "cell_search",
+        "-b",
+        "5",
+        "-g",
+        "45.5",
+        "-s",
+        "2400",
+        "-e",
+        "2649",
+    ]
 
 
 def test_runner_uses_configured_binary(tmp_path: Path) -> None:
@@ -75,9 +81,8 @@ def test_runner_uses_configured_binary(tmp_path: Path) -> None:
     binpath.write_text("", encoding="utf-8")
     runner = SrsranRunner(binpath, fake)  # type: ignore[arg-type]
     out = runner.run_cell_search(
-        frequency_mhz=869.5,
-        bandwidth=BandwidthMHz.BW_10,
-        device_index=0,
+        band=8,
+        gain_db=42.0,
         timeout_seconds=12.5,
     )
     assert out.stdout == "found: cell A"
@@ -90,9 +95,6 @@ def test_runner_falls_back_to_path(tmp_path: Path) -> None:
     """When binary_path is empty, runner queries shutil.which."""
     fake = _FakeRunner()
     runner = SrsranRunner(Path(), fake)  # type: ignore[arg-type]
-    # We don't assume srsRAN is on PATH — just exercise the lookup logic.
-    # Both branches are deterministic: an empty resolved string means nothing
-    # was found, otherwise it must be a non-empty path.
     try:
         resolved = runner.resolve_binary()
     except SrsranMissingError:
@@ -109,9 +111,8 @@ def test_runner_empty_path_raises_when_no_binary_on_path(
     monkeypatch.setattr("shutil.which", lambda _name: None)
     with pytest.raises(SrsranMissingError, match="not found on PATH"):
         runner.run_cell_search(
-            frequency_mhz=869.5,
-            bandwidth=BandwidthMHz.BW_10,
-            device_index=0,
+            band=8,
+            gain_db=42.0,
             timeout_seconds=1.0,
         )
 
@@ -121,9 +122,8 @@ def test_runner_missing_configured_binary(tmp_path: Path) -> None:
     runner = SrsranRunner(tmp_path / "missing-bin", fake)  # type: ignore[arg-type]
     with pytest.raises(SrsranMissingError, match="does not exist"):
         runner.run_cell_search(
-            frequency_mhz=869.5,
-            bandwidth=BandwidthMHz.BW_10,
-            device_index=0,
+            band=8,
+            gain_db=42.0,
             timeout_seconds=1.0,
         )
 
