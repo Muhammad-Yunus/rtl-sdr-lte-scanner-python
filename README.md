@@ -276,6 +276,24 @@ python3 -m src.cli.main scan --help
 > PSS detection (Physical Layer). These fields require a MIB/SIB decoder which is not yet implemented.
 > **Operator names** are resolved via EARFCN-to-frequency mapping from public spectrum allocations.
 
+### Field Glossary
+
+| Field | Description |
+|-------|------------|
+| **Frequency** | Downlink frequency in MHz. This is the frequency the RTL-SDR listens on. |
+| **Band** | LTE operating band. Band 8 = 925–960 MHz. Determines the frequency range. |
+| **EARFCN** | *E-UTRA Absolute Radio Frequency Channel Number*. A unique numeric ID for each channel within a band. Formula: `freq = 925 + 0.1 × (EARFCN - 3450)` for Band 8. |
+| **PCI** | *Physical Cell ID*. Physical layer identifier (0–503). Used to distinguish cells on the same frequency. PCI is **not** a globally unique ID — it can be reused across different cell sites. |
+| **Cell ID** | Unique cell identity within the operator's network. **Null** — requires MIB/SIB decode which `lte_cell_search` does not perform. |
+| **TAC** | *Tracking Area Code*. Geographic area where the cell is located. **Null** — requires MIB/SIB decode. |
+| **Bandwidth** | Channel bandwidth in MHz (3/5/10/15/20). Derived from the number of Physical Resource Blocks (PRB). |
+| **MCC** | *Mobile Country Code*. Country identifier (e.g. 510 = Indonesia). **Null** — requires MIB/SIB decode. |
+| **MNC** | *Mobile Network Code*. Operator identifier within a country (e.g. 10 = Telkomsel). **Null** — requires MIB/SIB decode. |
+| **Operator** | Operator name. Resolved via **EARFCN → frequency → known spectrum allocation** (not from MIB/SIB). |
+| **RSRP** | *Reference Signal Received Power*. Signal strength in dBm. More negative = weaker. -26 dBm = very strong, -100 dBm = weak. |
+| **RSRQ** | *Reference Signal Received Quality*. Signal quality in dB. **Null** — not provided by `lte_cell_search`. |
+| **SNR** | *Signal-to-Noise Ratio*. Signal quality in dB. **Null** — not available from cell search. |
+
 ---
 
 ## Architecture
