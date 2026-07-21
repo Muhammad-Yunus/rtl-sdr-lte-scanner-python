@@ -1,0 +1,65 @@
+{
+  "$schema": "Frequency-band operator mapping. Used as fallback when MCC/MNC is not available from cell search.",
+  "$note": "Key = band number. Each entry maps an EARFCN range to operator name and country.",
+  "bands": {
+    "8": {
+      "country": "Indonesia",
+      "operators": [
+        {
+          "operator": "Telkomsel",
+          "earfcn_start": 3450,
+          "earfcn_end": 3549,
+          "freq_start_mhz": 925.0,
+          "freq_end_mhz": 934.9
+        },
+        {
+          "operator": "Indosat Ooredoo Hutchison",
+          "earfcn_start": 3550,
+          "earfcn_end": 3649,
+          "freq_start_mhz": 935.0,
+          "freq_end_mhz": 944.9
+        },
+        {
+          "operator": "XL Axiata",
+          "earfcn_start": 3650,
+          "earfcn_end": 3749,
+          "freq_start_mhz": 945.0,
+          "freq_end_mhz": 954.9
+        },
+        {
+          "operator": "Smartfren",
+          "earfcn_start": 3750,
+          "earfcn_end": 3799,
+          "freq_start_mhz": 955.0,
+          "freq_end_mhz": 959.9
+        }
+      ]
+    },
+    "5": {
+      "country": "Indonesia",
+      "operators": [
+        {
+          "operator": "Telkomsel",
+          "earfcn_start": 2400,
+          "earfcn_end": 2499,
+          "freq_start_mhz": 869.0,
+          "freq_end_mhz": 878.9
+        },
+        {
+          "operator": "Indosat Ooredoo Hutchison",
+          "earfcn_start": 2500,
+          "earfcn_end": 2599,
+          "freq_start_mhz": 879.0,
+          "freq_end_mhz": 888.9
+        },
+        {
+          "operator": "XL Axiata",
+          "earfcn_start": 2600,
+          "earfcn_end": 2649,
+          "freq_start_mhz": 889.0,
+          "freq_end_mhz": 893.9
+        }
+      ]
+    }
+  }
+}

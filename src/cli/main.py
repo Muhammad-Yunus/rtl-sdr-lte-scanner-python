@@ -52,8 +52,11 @@ def build_application(
     config = AppConfig.from_toml(config_path)
     configure_logging(config.logging.level, config.logging.file)
 
+    from ..repository.frequency_band_db import FrequencyBandDatabase
+
     db = OperatorDatabase.from_json(Path("data/operators.json"))
-    resolver = OperatorResolver(db)
+    freq_db = FrequencyBandDatabase.from_json(Path("data/frequency_band_map.json"))
+    resolver = OperatorResolver(db, freq_db)
     runner_impl = runner or SubprocessRunner()
     srsran_runner = __import__(
         "src.services.srsran_runner", fromlist=["SrsranRunner"]
