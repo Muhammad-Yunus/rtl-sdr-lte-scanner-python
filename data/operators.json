@@ -1,0 +1,17 @@
+{
+  "$schema": "Local operator lookup table. No internet access is performed.",
+  "entries": [
+    {
+      "mcc": "510",
+      "mnc": "01",
+      "operator": "Indosat Ooredoo Hutchison",
+      "country": "Indonesia"
+    },
+    {
+      "mcc": "510",
+      "mnc": "10",
+      "operator": "Telkomsel",
+      "country": "Indonesia"
+    }
+  ]
+}

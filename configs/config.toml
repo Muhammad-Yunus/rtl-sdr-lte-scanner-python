@@ -1,0 +1,32 @@
+# LTE Scanner default configuration.
+# All runtime values live here so that no setting is hardcoded in source.
+
+[device]
+# Index of the RTL-SDR device to use. 0 = first dongle.
+index = 0
+
+[scan]
+# Default central frequency in MHz when --freq is not provided.
+default_frequency_mhz = 869.5
+# Per-scan timeout in seconds.
+timeout_seconds = 30
+# Number of retries when srsRAN exits without producing cells.
+retry_count = 2
+# Bands permitted when --band is omitted. Empty list = caller chooses.
+allowed_bands = []
+
+[output]
+# One of: table, json, csv, yaml
+format = "table"
+# Directory where exported scans are written.
+export_dir = "./exports"
+
+[logging]
+# One of: DEBUG, INFO, WARNING, ERROR
+level = "INFO"
+# Path to log file. Empty string = log to stderr only.
+file = ""
+
+[srsran]
+# Path to the srsRAN binary. Leave empty to rely on PATH lookup.
+binary_path = ""

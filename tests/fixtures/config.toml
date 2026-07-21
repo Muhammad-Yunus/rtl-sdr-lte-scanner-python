@@ -1,0 +1,19 @@
+[device]
+index = 1
+
+[scan]
+default_frequency_mhz = 942.5
+timeout_seconds = 45
+retry_count = 1
+allowed_bands = [3, 5, 8]
+
+[output]
+format = "json"
+export_dir = "./out"
+
+[logging]
+level = "DEBUG"
+file = ""
+
+[srsran]
+binary_path = ""
