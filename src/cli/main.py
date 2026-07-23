@@ -29,6 +29,7 @@ from ..services.exporter import ScanExporter
 from ..services.formatter import render
 from ..services.operator_resolver import OperatorResolver
 from ..services.srsran_runner import SubprocessRunner
+from ..utils.paths import get_data_dir
 
 __version__ = "0.1.0"
 
@@ -60,8 +61,9 @@ def build_application(
 
     from ..repository.frequency_band_db import FrequencyBandDatabase
 
-    db = OperatorDatabase.from_json(Path("data/operators.json"))
-    freq_db = FrequencyBandDatabase.from_json(Path("data/frequency_band_map.json"))
+    data_dir = get_data_dir()
+    db = OperatorDatabase.from_json(data_dir / "operators.json")
+    freq_db = FrequencyBandDatabase.from_json(data_dir / "frequency_band_map.json")
     resolver = OperatorResolver(db, freq_db)
     runner_impl = runner or SubprocessRunner()
     srsran_runner = __import__(
