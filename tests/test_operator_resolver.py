@@ -7,6 +7,7 @@ from pathlib import Path
 from src.domain.enums import Band, BandwidthMHz
 from src.domain.models import LTECell
 from src.repository.operator_db import OperatorDatabase
+from src.repository.frequency_band_db import FrequencyBandDatabase, FrequencyBandEntry
 from src.services.operator_resolver import OperatorResolver, ResolvedOperator
 
 FIXTURE = Path(__file__).parent / "fixtures" / "operators.json"
@@ -32,9 +33,11 @@ def _cell(mcc: int, mnc: int) -> LTECell:
 
 def test_resolve_known_operator() -> None:
     resolver = _make_resolver()
-    assert resolver.resolve(510, 10) == ResolvedOperator(
-        operator="Telkomsel", country="Indonesia"
-    )
+    result = resolver.resolve(510, 10)
+    assert result.operator == "Telkomsel"
+    assert result.country == "Indonesia"
+    assert result.mcc == 510
+    assert result.mnc == 10
 
 
 def test_resolve_unknown_returns_none() -> None:
@@ -47,11 +50,14 @@ def test_enrich_fills_operator_and_country() -> None:
     enriched = resolver.enrich(_cell(510, 10))
     assert enriched.operator == "Telkomsel"
     assert enriched.country == "Indonesia"
+    assert enriched.mcc == 510
+    assert enriched.mnc == 10
 
 
 def test_enrich_leaves_unknown_cell_untouched() -> None:
     resolver = _make_resolver()
     cell = _cell(999, 99)
+    # Returns same cell when no enrichment possible
     assert resolver.enrich(cell) is cell
 
 
@@ -67,3 +73,39 @@ def test_enrich_returns_new_instance_when_changing() -> None:
     enriched = resolver.enrich(cell)
     assert enriched is not cell
     assert cell.operator is None  # original frozen and unchanged
+
+
+def test_enrich_with_frequency_lookup() -> None:
+    """Test that frequency-band lookup also fills in MCC/MNC."""
+    from src.repository.frequency_band_db import FrequencyBandDatabase
+
+    freq_entry = FrequencyBandEntry(
+        operator="Telkomsel",
+        country="Indonesia",
+        earfcn_start=3450,
+        earfcn_end=3500,
+        freq_start_mhz=925.0,
+        freq_end_mhz=934.9,
+    )
+    freq_db = FrequencyBandDatabase([freq_entry])
+    resolver = OperatorResolver(OperatorDatabase.from_json(FIXTURE), freq_db)
+
+    # Create a cell without MCC/MNC but with an EARFCN in Telkomsel's range
+    cell = LTECell(
+        frequency_mhz=930.0,
+        earfcn=3500,
+        band=Band.BAND_8,
+        bandwidth_mhz=BandwidthMHz.BW_10,
+        pci=455,
+        cell_id=None,
+        tac=None,
+        mcc=None,
+        mnc=None,
+        operator=None,
+        country=None,
+    )
+    enriched = resolver.enrich(cell)
+    assert enriched.operator == "Telkomsel"
+    assert enriched.country == "Indonesia"
+    assert enriched.mcc == 510
+    assert enriched.mnc == 10
