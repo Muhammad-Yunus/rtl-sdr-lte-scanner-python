@@ -60,6 +60,32 @@
           "freq_end_mhz": 893.9
         }
       ]
+    },
+    "3": {
+      "country": "Indonesia",
+      "operators": [
+        {
+          "operator": "Telkomsel",
+          "earfcn_start": 1452,
+          "earfcn_end": 1692,
+          "freq_start_mhz": 1805.6,
+          "freq_end_mhz": 1829.6
+        },
+        {
+          "operator": "XL Axiata",
+          "earfcn_start": 1755,
+          "earfcn_end": 1790,
+          "freq_start_mhz": 1835.9,
+          "freq_end_mhz": 1840.0
+        },
+        {
+          "operator": "Indosat Ooredoo Hutchison",
+          "earfcn_start": 1800,
+          "earfcn_end": 1840,
+          "freq_start_mhz": 1844.5,
+          "freq_end_mhz": 1848.5
+        }
+      ]
     }
   }
 }
