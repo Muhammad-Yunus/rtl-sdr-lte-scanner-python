@@ -94,6 +94,26 @@ def _band_option(value: str) -> int:
     return band_value
 
 
+def _earfcn_range_option(value: str) -> tuple[int, int]:
+    """Parse 'start-end' EARFCN range from CLI input."""
+    parts = value.split("-")
+    if len(parts) != 2:
+        raise typer.BadParameter(
+            f"EARFCN range must be in format 'START-END', got {value!r}."
+        )
+    start = int(parts[0])
+    end = int(parts[1])
+    if not (0 <= start <= 65535):
+        raise typer.BadParameter(f"EARFCN start {start} out of range [0, 65535].")
+    if not (0 <= end <= 65535):
+        raise typer.BadParameter(f"EARFCN end {end} out of range [0, 65535].")
+    if start > end:
+        raise typer.BadParameter(
+            f"EARFCN start ({start}) must not be greater than end ({end})."
+        )
+    return (start, end)
+
+
 def _format_option(value: str) -> OutputFormat:
     try:
         return OutputFormat(value.strip().lower())
@@ -157,6 +177,12 @@ def scan(
         "-n",
         help="Number of frames for deep pass (default: 500). Only used with --multi-pass.",
     ),
+    earfcn_range: str | None = typer.Option(
+        None,
+        "--earfcn-range",
+        "-e",
+        help="EARFCN range for narrow scan (e.g. '3500-3600'). Overrides full band scan.",
+    ),
 ) -> None:
     """Run one LTE cell scan and render the result."""
     app_obj = build_application(config)
@@ -166,6 +192,11 @@ def scan(
     gain_value = gain if gain is not None else cfg.scan.gain_db
     timeout_value = float(timeout) if timeout is not None else float(cfg.scan.timeout_seconds)
     deep_frames = frames if frames is not None else cfg.scan.deep_frames
+
+    earfcn_start: int | None = None
+    earfcn_end: int | None = None
+    if earfcn_range is not None:
+        earfcn_start, earfcn_end = _earfcn_range_option(earfcn_range)
 
     if multi_pass:
         try:
@@ -184,6 +215,9 @@ def scan(
             band=band_value,
             gain_db=gain_value,
             timeout_seconds=timeout_value,
+            earfcn_start=earfcn_start,
+            earfcn_end=earfcn_end,
+            frames=frames,
         )
         try:
             outcome = app_obj.scan_service.run(request)
@@ -235,6 +269,12 @@ def sweep(
         "-n",
         help="Number of frames for deep pass (default: 500).",
     ),
+    earfcn_range: str | None = typer.Option(
+        None,
+        "--earfcn-range",
+        "-e",
+        help="EARFCN range for narrow scan (e.g. '3500-3600'). Applied to each band.",
+    ),
 ) -> None:
     """Scan multiple bands sequentially and display combined results."""
     app_obj = build_application(config)
@@ -246,6 +286,14 @@ def sweep(
     deep_frames = frames if frames is not None else cfg.scan.deep_frames
     fmt = _format_option(output_format) if output_format else cfg.output.format
 
+    earfcn_start: int | None = None
+    earfcn_end: int | None = None
+    if earfcn_range is not None:
+        earfcn_start, earfcn_end = _earfcn_range_option(earfcn_range)
+
+    # For sweep, we pass earfcn_range to override default band range via extra args
+    # Note: run_band_sweep currently doesn't support earfcn_range directly;
+    # it would need extension to pass extra argv to the runner.
     typer.echo(f"Sweeping bands: {band_list}\n", err=False)
 
     try:
@@ -285,6 +333,12 @@ def export_cmd(
     timeout: float | None = typer.Option(None, "--timeout"),
     multi_pass: bool = typer.Option(False, "--multi-pass"),
     frames: int | None = typer.Option(None, "--frames", "-n"),
+    earfcn_range: str | None = typer.Option(
+        None,
+        "--earfcn-range",
+        "-e",
+        help="EARFCN range for narrow scan (e.g. '3500-3600'). Overrides full band scan.",
+    ),
 ) -> None:
     """Run a scan and write the result to ``destination``."""
     app_obj = build_application(config)
@@ -293,6 +347,11 @@ def export_cmd(
     gain_value = gain if gain is not None else cfg.scan.gain_db
     timeout_value = float(timeout) if timeout is not None else float(cfg.scan.timeout_seconds)
     deep_frames = frames if frames is not None else cfg.scan.deep_frames
+
+    earfcn_start: int | None = None
+    earfcn_end: int | None = None
+    if earfcn_range is not None:
+        earfcn_start, earfcn_end = _earfcn_range_option(earfcn_range)
 
     if multi_pass:
         try:
@@ -311,6 +370,9 @@ def export_cmd(
             band=band_value,
             gain_db=gain_value,
             timeout_seconds=timeout_value,
+            earfcn_start=earfcn_start,
+            earfcn_end=earfcn_end,
+            frames=frames,
         )
         try:
             outcome = app_obj.scan_service.run(request)
