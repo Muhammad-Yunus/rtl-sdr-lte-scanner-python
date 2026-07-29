@@ -9,7 +9,7 @@
 [![Platform](https://img.shields.io/badge/Platform-Raspberry%20Pi%205-c51244)](https://www.raspberrypi.com/)
 [![srsRAN](https://img.shields.io/badge/srsRAN-4G-blue.svg)](https://www.srsran.com/)
 [![RTL-SDR](https://img.shields.io/badge/RTL--SDR-V3-orange.svg)](https://www.rtl-sdr.com/)
-[![Tests](https://img.shields.io/badge/Tests-147%20passed-brightgreen)](#testing)
+[![Tests](https://img.shields.io/badge/Tests-148%20passed-brightgreen)](#testing)
 
 <br>
 
@@ -194,6 +194,17 @@ python3 -m src.cli.main scan --band 8 --format json
 
 # Scan with longer timeout
 python3 -m src.cli.main scan --band 8 --timeout 600
+
+### Scan specific EARCFN range
+
+Filter by EARCFN instead of entire band using `--earfcn-range` (or `-e`). Format is `start-end`.
+
+```bash
+# Scan only EARCFN 3500-3600 on Band 8
+python3 -m src.cli.main scan --earfcn-range "3500-3600" --band 8
+
+# Scan a single EARCFN
+python3 -m src.cli.main scan --earfcn-range "3500-3500" --band 8
 ```
 
 ### Multi-pass scan
@@ -227,6 +238,23 @@ python3 -m src.cli.main sweep --bands 8,5 --multi-pass
 python3 -m src.cli.main sweep --bands 8,5 --format json
 ```
 
+### Scan specific EARCFN range
+
+You can scan a narrow EARCFN range instead of an entire band using `--earfcn-range` (or `-e`). This is useful for focusing on a specific frequency block.
+
+```bash
+# Scan only EARCFN 3500-3600 on Band 8
+python3 -m src.cli.main scan --earfcn-range "3500-3600" --band 8
+
+# Scan a single EARCFN
+python3 -m src.cli.main scan --earfcn-range "3500-3500" --band 8
+
+# Works with multi-pass and export too
+python3 -m src.cli.main scan --earfcn-range "3450-3500" --multi-pass --timeout 90
+```
+
+> **Note:** When using `--earfcn-range`, the tool scans each EARCFN in the specified range individually. The total scan time grows linearly with the number of EARCFNs scanned.
+
 ### Export results
 
 ```bash
@@ -255,17 +283,14 @@ python3 -m src.cli.main scan --help
 ### Table Output
 
 ```
-                                               LTE Cell Discovery
-┏━━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━┳━━━━━┳━━━━━━━━━┳━━━━━━┳━━━━━━━━━━━┳━━━━━━┳━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━┳━━━━━━┳━━━━┓
-┃ Frequency   ┃ Band       ┃ EARFCN ┃ PCI ┃ Cell ID ┃ TAC  ┃ Bandwidth ┃ MCC  ┃ MNC  ┃ Operator  ┃ RSRP    ┃ RSRQ ┃ S… ┃
-┡━━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━╇━━━━━╇━━━━━━━━━╇━━━━━━╇━━━━━━━━━━━╇━━━━━━╇━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━╇━━━━━━╇━━━━┩
-│ 930.100 MHz │ LTE Band 8 │ 3501   │ 243 │ None    │ None │ 10 MHz    │ None │ None │ Telkomsel │ -26 dBm │ -    │ -  │
-│ 930.100 MHz │ LTE Band 8 │ 3501   │ 416 │ None    │ None │ 20 MHz    │ None │ None │ Telkomsel │ -24 dBm │ -    │ -  │
-│ 930.200 MHz │ LTE Band 8 │ 3502   │ 2   │ None    │ None │ 5 MHz     │ None │ None │ Telkomsel │ -25 dBm │ -    │ -  │
-│ 930.400 MHz │ LTE Band 8 │ 3504   │ 2   │ None    │ None │ 3 MHz     │ None │ None │ Telkomsel │ -26 dBm │ -    │ -  │
-│ 930.600 MHz │ LTE Band 8 │ 3506   │ 0   │ None    │ None │ 20 MHz    │ None │ None │ Telkomsel │ -31 dBm │ -    │ -  │
-│ 945.300 MHz │ LTE Band 8 │ 3653   │ 112 │ None    │ None │ 10 MHz    │ None │ None │ XL Axiata │ -28 dBm │ -    │ -  │
-└─────────────┴────────────┴────────┴─────┴─────────┴──────┴───────────┴──────┴──────┴───────────┴─────────┴──────┴────┘
+                                                LTE Cell Discovery
+┏━━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━┳━━━━━┳━━━━━━━━━┳━━━━━━┳━━━━━━━━━━━┳━━━━━┳━━━━━┳━━━━━━━━━━━┳━━━━━━━━━┳━━━━━━┳━━━━┓
+┃ Frequency   ┃ Band       ┃ EARCFN ┃ PCI ┃ Cell ID ┃ TAC  ┃ Bandwidth ┃ MCC ┃ MNC ┃ Operator  ┃ RSRP    ┃ RSRQ ┃ SNR┃
+┡━━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━╇━━━━━╇━━━━━━━━━╇━━━━━━╇━━━━━━━━━━━╇━━━━━╇━━━━━╇━━━━━━━━━━━╇━━━━━━━━━╇━━━━━━╇━━━━┩
+│ 930.000 MHz │ LTE Band 8 │ 3500   │ 334 │ None    │ None │ 10 MHz    │ 510 │ 10  │ Telkomsel │ -30 dBm │ -    │ -  │
+│ 930.000 MHz │ LTE Band 8 │ 3500   │ 416 │ None    │ None │ 10 MHz    │ 510 │ 10  │ Telkomsel │ -31 dBm │ -    │ -  │
+│ 930.200 MHz │ LTE Band 8 │ 3502   │ 3   │ None    │ None │ 15 MHz    │ 510 │ 10  │ Telkomsel │ -33 dBm │ -    │ -  │
+└─────────────┴────────────┴────────┴─────┴─────────┴──────┴───────────┴─────┴─────┴───────────┴─────────┴──────┴────┘
 ```
 
 ### JSON Output
@@ -273,16 +298,16 @@ python3 -m src.cli.main scan --help
 ```json
 [
   {
-    "frequency_mhz": 930.1,
-    "earfcn": 3501,
+    "frequency_mhz": 930.0,
+    "earfcn": 3500,
     "band": "8",
     "bandwidth_mhz": 10,
-    "pci": 243,
+    "pci": 334,
     "cell_id": null,
     "tac": null,
-    "mcc": null,
-    "mnc": null,
-    "rsrp": -26,
+    "mcc": 510,
+    "mnc": 10,
+    "rsrp": -30,
     "rsrq": null,
     "snr": null,
     "operator": "Telkomsel",
@@ -297,8 +322,8 @@ python3 -m src.cli.main scan --help
     "pci": 112,
     "cell_id": null,
     "tac": null,
-    "mcc": null,
-    "mnc": null,
+    "mcc": 510,
+    "mnc": 21,
     "rsrp": -28,
     "rsrq": null,
     "snr": null,
@@ -309,9 +334,7 @@ python3 -m src.cli.main scan --help
 ]
 ```
 
-> **Note:** `cell_id`, `tac`, `mcc`, `mnc` are `null` because `lte_cell_search` only performs
-> PSS detection (Physical Layer). These fields require a MIB/SIB decoder which is not yet implemented.
-> **Operator names** are resolved via EARFCN-to-frequency mapping from public spectrum allocations.
+> **Note:** `cell_id` and `tac` are `null` because `lte_cell_search` only performs PSS detection (Physical Layer). These fields require a MIB/SIB decoder which is not yet implemented. Operator names, MCC, and MNC are inferred from EARFCN-to-frequency mapping using public spectrum allocation data.
 
 ### Field Glossary
 
@@ -324,8 +347,8 @@ python3 -m src.cli.main scan --help
 | **Cell ID** | Unique cell identity within the operator's network. **Null** — requires MIB/SIB decode which `lte_cell_search` does not perform. |
 | **TAC** | *Tracking Area Code*. Geographic area where the cell is located. **Null** — requires MIB/SIB decode. |
 | **Bandwidth** | Channel bandwidth in MHz (3/5/10/15/20). Derived from the number of Physical Resource Blocks (PRB). |
-| **MCC** | *Mobile Country Code*. Country identifier (e.g. 510 = Indonesia). **Null** — requires MIB/SIB decode. |
-| **MNC** | *Mobile Network Code*. Operator identifier within a country (e.g. 10 = Telkomsel). **Null** — requires MIB/SIB decode. |
+| **MCC** | *Mobile Country Code*. Country identifier (e.g., 510 = Indonesia). Populated from operator mapping when detected via EARCFN/frequency lookup. |
+| **MNC** | *Mobile Network Code*. Operator identifier within a country (e.g., 10 = Telkomsel). Populated from operator mapping when detected via frequency-band lookup. |
 | **Operator** | Operator name. Resolved via **EARFCN → frequency → known spectrum allocation** (not from MIB/SIB). |
 | **RSRP** | *Reference Signal Received Power*. Signal strength in dBm. More negative = weaker. -26 dBm = very strong, -100 dBm = weak. |
 | **RSRQ** | *Reference Signal Received Quality*. Signal quality in dB. **Null** — not provided by `lte_cell_search`. |
@@ -457,13 +480,18 @@ All **147 tests** pass on Raspberry Pi 5.
 
 ## Operator Database
 
-`data/operators.json` maps MCC/MNC pairs to operator names and countries.
-Currently includes:
+`data/operators.json` maps MCC/MNC pairs to operator names and countries. This is used for direct MCC/MNC lookups when available from MIB/SIB decode (not yet implemented). Additionally, **operator names and MCC/MNC are inferred from frequency-band allocation** via `frequency_band_map.json`, providing complete scan results even without full SIB decoding.
+
+Currently includes Indonesian operators:
 
 | MCC | MNC | Operator | Country |
 |-----|-----|----------|---------|
-| 510 | 01 | Indosat Ooredoo Hutchison | Indonesia |
-| 510 | 10 | Telkomsel | Indonesia |
+| 510 | 01  | Indosat Ooredoo Hutchison | Indonesia |
+| 510 | 07  | Three Indonesia | Indonesia |
+| 510 | 09  | Axis | Indonesia |
+| 510 | 10  | Telkomsel | Indonesia |
+| 510 | 11  | Smartfren | Indonesia |
+| 510 | 21  | XL Axiata | Indonesia |
 
 Add more entries to expand the lookup database. Format:
 
