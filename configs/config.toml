@@ -13,7 +13,7 @@ default_frequency_mhz = 869.5
 # RF gain in dB. 40-49 recommended for RTL-SDR R820T.
 gain_db = 42.0
 # Per-scan timeout in seconds.
-timeout_seconds = 30
+timeout_seconds = 90
 # Number of retries when srsRAN exits without producing cells.
 retry_count = 2
 # Bands permitted when --band is omitted. Empty list = caller chooses.
