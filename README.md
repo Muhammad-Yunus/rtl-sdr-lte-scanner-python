@@ -585,6 +585,93 @@ binary_path = "/home/pi/srsRAN_4G/build/lib/examples/cell_search"
 
 ---
 
+## RTL-SDR V3 Limitations & Real-World Scan Notes
+
+### Hardware Specifications
+
+| Parameter | Specification |
+|-----------|-------------|
+| **Model** | RTL-SDR V3 (R820T tuner) |
+| **Frequency range** | 24 MHz - 1766 MHz |
+| **Optimal range** | 50 MHz - 1000 MHz |
+| **Sensitivity** | ~-90 dBm (vs mobile phone -100 dBm) |
+| **USB power** | 500mA max (bus-powered) |
+
+### Supported Bands Analysis
+
+| Band | Frequency | RTL-SDR Status | Operators (Indonesia) |
+|------|-----------|---------------|----------------------|
+| **Band 8** | 925-960 MHz | ✅ **Excellent** - Best performance | Telkomsel, Indosat, XL, Smartfren |
+| **Band 5** | 869-894 MHz | ✅ **Good** - Reliable detection | Telkomsel, Indosat, XL |
+| **Band 28** | 703-748 MHz | ✅ **Good** - Should work well | XL Axiata (needs mapping update) |
+| **Band 3** | 1805-1880 MHz | ⚠️ **Problematic** - PLL instability above 1500 MHz | Rarely detectable |
+
+### Common Issues & Solutions
+
+#### 1. PLL Not Locked (Band 3)
+```
+[R82XX] PLL not locked!
+```
+**Cause:** R820T tuner struggles to lock above 1500 MHz.
+**Solution:** Avoid Band 3 (1800 MHz). Use Band 8 or Band 5 instead.
+
+#### 2. Timeout Errors
+**Cause:** Default 30s timeout too short for full band scans.
+**Solution:** Use `--timeout 90` or longer for reliable operation.
+
+#### 3. Weak Signal Detection
+**Issue:** Phone shows XL/Indosat signal but RTL-SDR doesn't detect.
+**Causes:**
+- Mobile phone modems are more sensitive (-100 dBm vs -90 dBm)
+- BTS may be far in specific direction
+- Building/terrain obstruction
+- Antenna positioning
+
+**Solutions:**
+- Move to higher floor or near window
+- Use external antenna
+- Scan with longer timeout (`--timeout 120`)
+
+### Real-World Scan Results
+
+Tested on Raspberry Pi 5 with RTL-SDR V3 and 50cm telescopic antenna:
+
+**Band 8 (925-960 MHz) - Excellent Results:**
+```
+Found 7 cells - All Telkomsel (MCC=510, MNC=10)
+RSRP: -8 to -15 dBm (very strong signal)
+Distance: ~100-300m from BTS
+```
+
+**Band 5 (869-894 MHz) - Moderate Results:**
+```
+Found 1 cell - Telkomsel only
+RSRP: -15 dBm
+XL/Indosat not detected (signal too weak or BTS far)
+```
+
+**Why XL/Indosat not detected in Band 5?**
+- BTS may be in different direction
+- Signal strength below RTL-SDR threshold
+- Phone has better sensitivity and signal processing
+
+### Recommendations
+
+1. **Best band for scanning:** Band 8 (925-960 MHz)
+2. **Secondary band:** Band 5 (869-894 MHz)
+3. **Avoid:** Band 3 (1800 MHz) due to PLL issues
+4. **Antenna:** 50cm telescopic works well for Band 8/5
+5. **Positioning:** Near window, elevated location improves detection
+
+### Future Improvements
+
+- [ ] Add Band 28 (700 MHz) mapping for XL detection
+- [ ] Implement signal averaging for weak signals
+- [ ] Add GPS integration for location-tagged scans
+- [ ] Support external trigger for synchronized scanning
+
+---
+
 ## Roadmap
 
 - [x] Cell search via srsRAN
