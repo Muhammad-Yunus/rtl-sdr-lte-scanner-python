@@ -11,8 +11,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 cd "$PROJECT_DIR"
 
-# CLI command
-CLI="python3 -m src.cli.main scan"
+# CLI command with JSON output
+CLI="python3 -m src.cli.main scan --format json"
 
 # Scan parameters
 GAIN=42
