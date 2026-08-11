@@ -49,7 +49,7 @@ scan_operator() {
         [ $end -gt $earfcn_end ] && end=$earfcn_end
         
         echo -n "  Scanning ${current}-${end}... "
-        $CLI --band 8 --gain $GAIN --earfcn-range "${current}-${end}" --timeout $TIMEOUT --frames $FRAMES 2>/dev/null | tail -1
+        $CLI --band 8 --gain $GAIN --earfcn-range "${current}-${end}" --timeout $TIMEOUT --frames $FRAMES
         echo ""
         
         current=$((end + 1))
