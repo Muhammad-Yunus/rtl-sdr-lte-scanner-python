@@ -287,10 +287,9 @@ python3 -m src.cli.main scan --help
 ┏━━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━┳━━━━━┳━━━━━━━━━┳━━━━━━┳━━━━━━━━━━━┳━━━━━┳━━━━━┳━━━━━━━━━━━┳━━━━━━━━━┳━━━━━━┳━━━━┓
 ┃ Frequency   ┃ Band       ┃ EARCFN ┃ PCI ┃ Cell ID ┃ TAC  ┃ Bandwidth ┃ MCC ┃ MNC ┃ Operator  ┃ RSRP    ┃ RSRQ ┃ SNR┃
 ┡━━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━╇━━━━━╇━━━━━━━━━╇━━━━━━╇━━━━━━━━━━━╇━━━━━╇━━━━━╇━━━━━━━━━━━╇━━━━━━━━━╇━━━━━━╇━━━━┩
-│ 930.000 MHz │ LTE Band 8 │ 3500   │ 334 │ None    │ None │ 10 MHz    │ 510 │ 10  │ Telkomsel │ -30 dBm │ -    │ -  │
-│ 930.000 MHz │ LTE Band 8 │ 3500   │ 416 │ None    │ None │ 10 MHz    │ 510 │ 10  │ Telkomsel │ -31 dBm │ -    │ -  │
-│ 930.200 MHz │ LTE Band 8 │ 3502   │ 3   │ None    │ None │ 15 MHz    │ 510 │ 10  │ Telkomsel │ -33 dBm │ -    │ -  │
-└─────────────┴────────────┴────────┴─────┴─────────┴──────┴───────────┴─────┴─────┴───────────┴─────────┴──────┴────┘
+│ 929.500 MHz │ LTE Band 8 │ 3495   │ 0   │ None    │ None │ 5 MHz     │ 510 │ 10  │ Telkomsel │ -18 dBm │ -    │ -  │
+│ 929.500 MHz │ LTE Band 8 │ 3495   │ 473 │ None    │ None │ 20 MHz    │ 510 │ 10  │ Telkomsel │ -16 dBm │ -    │ -  │
+│ 930.200 MHz │ LTE Band 8 │ 3502   │ 2   │ None    │ None │ 20 MHz    │ 510 │ 10  │ Telkomsel │ -10 dBm │ -    │ -  │
 ```
 
 ### JSON Output
