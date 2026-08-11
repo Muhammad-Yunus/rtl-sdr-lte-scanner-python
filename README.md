@@ -166,12 +166,48 @@ binary_path = "/home/pi/srsRAN_4G/build/lib/examples/cell_search"
 |-----|---------|-------------|
 | `default_band` | `8` | LTE band to scan (3, 5, 8) |
 | `gain_db` | `42.0` | RF gain in dB (40-49 optimal for R820T) |
-| `timeout_seconds` | `30` | Max scan duration per band |
+| `timeout_seconds` | `90` | Max scan duration per band (default 30s too short for full band) |
 | `multi_pass` | `false` | Enable two-pass scan (quick → deep) |
 | `quick_frames` | `10` | Frames for quick discovery pass |
 | `deep_frames` | `500` | Frames for deep accuracy pass |
 | `binary_path` | - | Absolute path to `cell_search` binary |
 | `format` | `table` | Default output format (table/json/csv/yaml) |
+
+---
+
+## RTL-SDR Detection
+
+**Important:** The CLI does **NOT** directly detect or configure the RTL-SDR device. All RF processing is delegated to srsRAN, which uses **SoapySDR** for automatic device discovery.
+
+### How it Works
+
+```
+CLI (Python) → srsRAN binary → SoapySDR auto-detects RTL-SDR
+                                              ↓
+                                   Found: /dev/bus/usb/001/002
+                                   Serial: 00000001
+                                   Tuner: Rafael Micro R820T
+```
+
+### Device Location
+
+- RTL-SDR devices are accessed via **USB path** (e.g., `/dev/bus/usb/001/002`), NOT via ttyUSB
+- ttyUSB devices (ttyUSB0, ttyUSB1, ttyUSB2) are typically for **modems** (Huawei, etc.)
+- SoapySDR handles all device discovery automatically — no configuration needed
+
+### Verify RTL-SDR Detection
+
+```bash
+# Check USB device
+lsusb | grep -i rtl
+# Expected: Bus 001 Device XXX: ID 0bda:2838 Realtek Semiconductor Corp. RTL2838 DVB-T
+
+# Verify SoapySDR detection
+SoapySDRUtil --find="driver=rtlsdr"
+# Expected: Found Rafael Micro R820T tuner
+```
+
+> **Note:** If you have both RTL-SDR and a USB modem, the modem will appear as ttyUSB0-2, but RTL-SDR is accessed directly by SoapySDR via USB.
 
 ---
 

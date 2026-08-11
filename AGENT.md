@@ -547,3 +547,47 @@ These extensions should be additive and should not require major refactoring of 
 - Every feature should be independently testable.
 - Every module should be replaceable without affecting unrelated components.
 - Software should remain understandable after years of maintenance.
+
+---
+
+## RTL-SDR Detection Architecture
+
+### Important: No Manual Device Detection in CLI
+
+The CLI **does not** detect or configure RTL-SDR devices directly. This is handled entirely by:
+
+1. **srsRAN binary** - receives device parameters from CLI
+2. **SoapySDR** - automatically discovers and opens RTL-SDR devices
+
+### Device Discovery Flow
+
+```
+CLI passes: -b <band> -g <gain>
+    ↓
+srsRAN initializes SoapySDR
+    ↓
+SoapySDR scans USB buses for RTL-SDR devices
+    ↓
+Auto-discovers: driver=rtlsdr, serial=00000001
+    ↓
+Opens: /dev/bus/usb/001/002 (NOT ttyUSB)
+```
+
+### Key Points
+
+- **RTL-SDR is NOT on ttyUSB** - it's accessed via USB path directly
+- **ttyUSB0-2** are typically for USB modems (Huawei, etc.)
+- **No config needed** for device selection - SoapySDR auto-detects
+- **Timeout issue**: Default 30s is too short for full band scans. Use 90s+ for reliable operation.
+
+### Verification Commands
+
+```bash
+# Check RTL-SDR USB detection
+lsusb | grep -i rtl
+# Expected: ID 0bda:2838 Realtek Semiconductor Corp. RTL2838 DVB-T
+
+# Verify SoapySDR detection
+SoapySDRUtil --find="driver=rtlsdr"
+# Expected: Found Rafael Micro R820T tuner
+```
