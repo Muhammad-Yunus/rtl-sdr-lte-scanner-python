@@ -31,7 +31,7 @@ from ..services.operator_resolver import OperatorResolver
 from ..services.srsran_runner import SubprocessRunner
 from ..utils.paths import get_data_dir
 
-__version__ = "0.1.0"
+__version__ = "1.0.0"
 
 app = typer.Typer(
     name="lte-scan",
