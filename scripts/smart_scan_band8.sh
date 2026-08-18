@@ -1,8 +1,8 @@
 #!/bin/bash
 #
-# Smart Band 8 Scan - Skip Empty Ranges Based on Cache
-# Reads data/smart_scan_cache.json for active EARFCNs
-# Auto-generates cache by running init_scan_cache.sh if missing
+# Smart Band 8 Scan - Skip Empty CHUNKS
+# Scans only EARFCN segments that have signals in cache
+# Not operator-level skip, but segment-level skip
 #
 
 set -e
@@ -17,15 +17,12 @@ CLI="python3 -m src.cli.main scan --format json"
 
 # Scan parameters
 GAIN=42
-TIMEOUT=30
+TIMEOUT=60  # Increased timeout per chunk
 FRAMES=5
-CHUNK_SIZE=10
-
-# Cache file
-CACHE_FILE="data/smart_scan_cache.json"
+CHUNK_SIZE=10  # Scan in 10-EARFCN segments
 
 echo "========================================"
-echo "  Smart Band 8 Scan (Cache Mode)"
+echo "  Smart Band 8 Scan (Chunk Mode)"
 echo "========================================"
 echo ""
 echo "Configuration:"
@@ -36,73 +33,79 @@ echo "  Chunk size: ${CHUNK_SIZE} EARFCNs"
 echo ""
 
 # Check if cache exists
+CACHE_FILE="data/smart_scan_cache.json"
 if [ ! -f "$CACHE_FILE" ]; then
-    echo "WARNING: Cache file not found: $CACHE_FILE"
+    echo "ERROR: Cache file not found: $CACHE_FILE"
     echo "Please run ./scripts/init_scan_cache.sh first"
-    echo ""
-    echo "Example:"
-    echo "  ./scripts/init_scan_cache.sh"
     exit 1
 fi
 
 echo "Loading cache from: $CACHE_FILE"
-echo ""
 
-# Load active EARFCNs from cache
-ACTIVE_EARFCNS=$(python3 -c "
+# Extract active EARFCNs from cache
+python3 -c "
 import json
-import sys
 
 with open('$CACHE_FILE') as f:
     data = json.load(f)
 
-# Extract all active EARFCNs
+# Get all active EARFCNs
 all_earfcns = []
 for op, info in data.items():
     all_earfcns.extend(info['earfcns'])
 
 print(json.dumps(sorted(set(all_earfcns))))
-")
+" > /tmp/smart_scan_active_earfcns.json
 
+ACTIVE_EARFCNS=$(cat /tmp/smart_scan_active_earfcns.json)
 echo "Active EARFCNs in cache: $ACTIVE_EARFCNS"
 echo ""
 
-# Function to check if range has any cells in cache
-has_signal_in_range() {
+# Function to find which chunks have signals
+find_active_chunks() {
     local start=$1
     local end=$2
-    local cache_earfcns="$3"
+    local earfcns_json="$3"
     
-    echo "$cache_earfcns" | python3 -c "
+    echo "$earfcns_json" | python3 -c "
 import json
 import sys
 
 start = $start
 end = $end
+chunk_size = $CHUNK_SIZE
 data = json.load(sys.stdin)
 
-# Check if any earfcn falls in this range
-found = any(start <= e <= end for e in data)
-print('true' if found else 'false')
+# Find which chunks have any active EARFCNs
+active_chunks = []
+current = start
+while current <= end:
+    chunk_end = min(current + chunk_size - 1, end)
+    
+    # Check if any active earfcn falls in this chunk
+    has_signal = any(current <= e <= chunk_end for e in data)
+    
+    if has_signal:
+        active_chunks.append(f'{current}-{chunk_end}')
+    
+    current = chunk_end + 1
+
+print(','.join(active_chunks) if active_chunks else 'NONE')
 "
 }
 
-# Function to scan one operator range (in chunks)
-scan_operator() {
+# Function to scan specific chunks
+scan_chunks() {
     local operator="$1"
     local earfcn_start="$2"
     local earfcn_end="$3"
-    local cache_earfcns="$4"
+    local active_chunks="$4"
     
-    # Check if this range has any cells in cache
-    local has_signal
-    has_signal=$(has_signal_in_range "$earfcn_start" "$earfcn_end" "$cache_earfcns")
-    
-    if [ "$has_signal" = "false" ]; then
+    if [ "$active_chunks" = "NONE" ]; then
         echo "----------------------------------------"
         echo "SKIPPING: ${operator}"
         echo "  EARFCN Range: ${earfcn_start}-${earfcn_end}"
-        echo "  Reason: No signal in cache"
+        echo "  Reason: No active chunks in cache"
         echo "----------------------------------------"
         return 0
     fi
@@ -110,19 +113,18 @@ scan_operator() {
     echo "----------------------------------------"
     echo "SCANNING: ${operator}"
     echo "  EARFCN Range: ${earfcn_start}-${earfcn_end}"
+    echo "  Active chunks: ${active_chunks}"
     echo "----------------------------------------"
     
-    # Split into chunks
-    local current=$earfcn_start
-    while [ $current -le $earfcn_end ]; do
-        local end=$((current + CHUNK_SIZE - 1))
-        [ $end -gt $earfcn_end ] && end=$earfcn_end
+    # Scan only active chunks
+    IFS=',' read -ra CHUNKS <<< "$active_chunks"
+    for chunk in "${CHUNKS[@]}"; do
+        local chunk_start=$(echo "$chunk" | cut -d'-' -f1)
+        local chunk_end=$(echo "$chunk" | cut -d'-' -f2)
         
-        echo -n "  Scanning ${current}-${end}... "
-        $CLI --band 8 --gain "$GAIN" --earfcn-range "${current}-${end}" --timeout "$TIMEOUT" --frames "$FRAMES"
+        echo -n "  Scanning ${chunk_start}-${chunk_end}... "
+        $CLI --band 8 --gain "$GAIN" --earfcn-range "${chunk_start}-${chunk_end}" --timeout "$TIMEOUT" --frames "$FRAMES"
         echo ""
-        
-        current=$((end + 1))
     done
 }
 
@@ -139,29 +141,40 @@ for op in operators:
 ")
 
 # Main execution
-echo "Starting Smart Band 8 scan..."
+echo "Starting Smart Band 8 scan (chunk-level skip)..."
 echo ""
 
 SCAN_COUNT=0
 SKIP_COUNT=0
+TOTAL_CHUNKS=0
+SCANNED_CHUNKS=0
 
 while IFS='=' read -r operator ranges; do
     read -r start end <<< "$ranges"
     
-    # Check if range has signals
-    has_signal=$(has_signal_in_range "$start" "$end" "$ACTIVE_EARFCNS")
+    # Find which chunks have signals
+    active_chunks=$(find_active_chunks "$start" "$end" "$ACTIVE_EARFCNS")
     
-    if [ "$has_signal" = "true" ]; then
-        scan_operator "$operator" "$start" "$end" "$ACTIVE_EARFCNS"
-        SCAN_COUNT=$((SCAN_COUNT + 1))
-    else
+    if [ "$active_chunks" = "NONE" ]; then
         SKIP_COUNT=$((SKIP_COUNT + 1))
         echo "----------------------------------------"
         echo "SKIPPING: ${operator}"
         echo "  EARFCN Range: ${start}-${end}"
-        echo "  Reason: No signal in cache"
+        echo "  Reason: No active chunks in cache"
         echo "----------------------------------------"
+    else
+        scan_chunks "$operator" "$start" "$end" "$active_chunks"
+        SCAN_COUNT=$((SCAN_COUNT + 1))
+        
+        # Count chunks scanned
+        IFS=',' read -ra CHUNKS <<< "$active_chunks"
+        SCANNED_CHUNKS=$((SCANNED_CHUNKS + ${#CHUNKS[@]}))
     fi
+    
+    # Count total chunks for this operator
+    total_chunks=$(( (end - start + 1 + CHUNK_SIZE - 1) / CHUNK_SIZE ))
+    TOTAL_CHUNKS=$((TOTAL_CHUNKS + total_chunks))
+    
 done <<< "$OPERATOR_DATA"
 
 echo "========================================"
@@ -170,7 +183,11 @@ echo "========================================"
 echo ""
 echo "Summary:"
 echo "  - Total operator ranges: $((SCAN_COUNT + SKIP_COUNT))"
-echo "  - Ranges scanned: ${SCAN_COUNT}"
-echo "  - Ranges skipped: ${SKIP_COUNT}"
-echo "  - Expected operators: Telkomsel, Indosat, XL, Smartfren"
+echo "  - Operators scanned: ${SCAN_COUNT}"
+echo "  - Operators skipped: ${SKIP_COUNT}"
+echo "  - Chunks scanned: ${SCANNED_CHUNKS}/${TOTAL_CHUNKS}"
+echo "  - Skip rate: $(( (TOTAL_CHUNKS - SCANNED_CHUNKS) * 100 / TOTAL_CHUNKS ))%"
+echo ""
+echo "  Example: If Telkomsel has 10 chunks but only 2 have signals,"
+echo "           we skip 8 chunks (80% skip rate)"
 echo ""
