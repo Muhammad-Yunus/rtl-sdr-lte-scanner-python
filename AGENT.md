@@ -550,6 +550,68 @@ These extensions should be additive and should not require major refactoring of 
 
 ---
 
+# ⚠️ HARDWARE & DRIVER POLICY - STRICT WARNING
+
+## NEVER ACCESS HARDWARE OR DRIVERS DIRECTLY
+
+**This is a CRITICAL violation boundary that must NEVER be crossed.**
+
+### What I MUST NOT Do:
+
+1. **NO direct device access** - Never use `echo`, `tee`, `cat`, or any command to write to `/dev/bus/usb/*`, `/sys/bus/usb/*`, or any hardware device path
+2. **NO driver manipulation** - Never run commands to bind/unbind kernel drivers (`modprobe`, `rmmod`, `echo driver > /sys/bus/.../driver/bind`)
+3. **NO USB reconfiguration** - Never attempt to reconfigure USB interfaces or device classes
+4. **NO hardware troubleshooting** - If hardware fails, report the error and STOP. Do not attempt to fix it.
+
+### What I MUST Do Instead:
+
+1. **Report hardware errors clearly** - If a scan fails due to hardware issues, state the error and let the human decide next steps
+2. **Suggest commands for human execution** - If driver/hardware work is needed, provide the commands as text recommendations that the human can run manually
+3. **Focus on code only** - My role is to write, test, and maintain the Python application code. Hardware is out of scope.
+4. **Respect system boundaries** - The system has working hardware configurations. Do not touch them.
+
+### Example Violations (NEVER DO THESE):
+
+```bash
+# ❌ NEVER RUN - Direct hardware access
+echo "something" > /dev/bus/usb/001/002
+echo -n "driver" | tee /sys/bus/usb/devices/1-2:1.0/driver/unbind
+
+# ❌ NEVER RUN - Driver manipulation  
+sudo modprobe rtl2832u
+sudo rmmod dvb_usb_rtl28xxu
+
+# ❌ NEVER RUN - Device probing
+lsmod | grep rtl
+dmesg | grep -i rtl
+```
+
+### Correct Approach:
+
+```bash
+# ✅ Report error and stop
+echo "ERROR: RTL-SDR device not accessible. Please check hardware connection."
+
+# ✅ Suggest human execution
+# Run these commands manually if needed:
+# sudo modprobe rtl2832u
+# lsusb | grep -i rtl
+```
+
+### Hardware is Human Territory
+
+Hardware configuration, driver loading, USB device management, and system-level troubleshooting are **human responsibilities only**. AI assistants must:
+
+- Detect hardware failures through error messages
+- Report them clearly
+- Stop execution immediately
+- Provide diagnostic information as text
+- NEVER attempt to fix or manipulate hardware directly
+
+This policy exists to prevent accidental system damage and maintain clear separation between software logic and system infrastructure.
+
+---
+
 ## RTL-SDR Detection Architecture
 
 ### Important: No Manual Device Detection in CLI

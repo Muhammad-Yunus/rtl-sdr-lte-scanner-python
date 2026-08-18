@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Mapping, Protocol, Sequence
 
 from ..domain.exceptions import ScanTimeoutError, SrsranMissingError
+from .lock_manager import ScanDeviceBusyError, acquire_rtl_sdr_lock
 
 
 @dataclass(frozen=True, slots=True)
@@ -157,6 +158,12 @@ class SrsranRunner:
         earfcn_end: int | None = None,
         frames: int | None = None,
     ) -> SrsranResult:
+        """Run cell search with RTL-SDR device lock.
+
+        Acquires exclusive lock on RTL-SDR device before running the scan.
+        If the device is busy (locked by another process), raises
+        ScanDeviceBusyError immediately.
+        """
         binary = self.resolve_binary()
         argv = build_cell_search_args(
             binary,
@@ -166,7 +173,10 @@ class SrsranRunner:
             earfcn_end=earfcn_end,
             frames=frames,
         )
-        return self._runner.run(argv, timeout_seconds=timeout_seconds)
+
+        # Acquire lock before running scan
+        with acquire_rtl_sdr_lock():
+            return self._runner.run(argv, timeout_seconds=timeout_seconds)
 
     def with_resolved_binary(self, binary: str) -> "SrsranRunner":
         """Return a copy that uses ``binary`` directly, skipping PATH lookup."""
