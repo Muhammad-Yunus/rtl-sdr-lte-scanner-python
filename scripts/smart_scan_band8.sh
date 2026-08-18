@@ -21,13 +21,13 @@ cd "$PROJECT_DIR"
 # CLI command with JSON output
 CLI="python3 -m src.cli.main scan --format json"
 
-# Scan parameters
-GAIN=42
-TIMEOUT=60
-FRAMES=5
+# Scan parameters - Optimized for weak signal detection
+GAIN=36  # Lower gain = better stability for weak signals
+TIMEOUT=60  # Longer timeout for borderline cells
+FRAMES=15  # More frames = better averaging
 CHUNK_SIZE=10
-MAX_RETRIES=3  # Retry empty chunks up to 3 times
-RETRY_DELAY=2  # Seconds between retries
+MAX_RETRIES=3
+RETRY_DELAY=1
 
 # Check for flags
 REFRESH_CACHE=false
@@ -50,7 +50,7 @@ echo "  Smart Band 8 Scan (Chunk Mode)"
 echo "========================================"
 echo ""
 echo "Configuration:"
-echo "  Gain: ${GAIN} dB"
+echo "  Gain: ${GAIN} dB (optimized for weak signals)"
 echo "  Timeout: ${TIMEOUT}s per chunk"
 echo "  Frames: ${FRAMES}"
 echo "  Chunk size: ${CHUNK_SIZE} EARFCNs"
