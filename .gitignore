@@ -8,3 +8,7 @@ build/
 venv/
 pyproject.toml~
 *.log
+
+# Smart scan cache
+data/smart_scan_cache.json
+exports/

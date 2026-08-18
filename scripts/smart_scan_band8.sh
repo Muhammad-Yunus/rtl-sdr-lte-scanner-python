@@ -1,9 +1,8 @@
 #!/bin/bash
 #
-# Smart Band 8 Scan - Skip Empty Ranges Based on Previous Results
-# Reads frequency_band_map.json for operator ranges
-# Uses exports/*.json to detect which ranges have signals
-# Skips scanning ranges with no cells
+# Smart Band 8 Scan - Skip Empty Ranges Based on Cache
+# Reads data/smart_scan_cache.json for active EARFCNs
+# Auto-generates cache by running init_scan_cache.sh if missing
 #
 
 set -e
@@ -22,8 +21,11 @@ TIMEOUT=30
 FRAMES=5
 CHUNK_SIZE=10
 
+# Cache file
+CACHE_FILE="data/smart_scan_cache.json"
+
 echo "========================================"
-echo "  Smart Band 8 Scan (Range Skip Mode)"
+echo "  Smart Band 8 Scan (Cache Mode)"
 echo "========================================"
 echo ""
 echo "Configuration:"
@@ -33,44 +35,45 @@ echo "  Frames: ${FRAMES}"
 echo "  Chunk size: ${CHUNK_SIZE} EARFCNs"
 echo ""
 
-# Function to load previous scan results
-load_previous_results() {
-    local results_file="/tmp/smart_scan_cache.json"
-    
-    # Find latest exports and extract cell locations
-    python3 -c "
+# Check if cache exists
+if [ ! -f "$CACHE_FILE" ]; then
+    echo "WARNING: Cache file not found: $CACHE_FILE"
+    echo "Please run ./scripts/init_scan_cache.sh first"
+    echo ""
+    echo "Example:"
+    echo "  ./scripts/init_scan_cache.sh"
+    exit 1
+fi
+
+echo "Loading cache from: $CACHE_FILE"
+echo ""
+
+# Load active EARFCNs from cache
+ACTIVE_EARFCNS=$(python3 -c "
 import json
-from pathlib import Path
-import glob
+import sys
 
-exports = Path('exports')
-if not exports.exists():
-    print('{}')
-    exit()
+with open('$CACHE_FILE') as f:
+    data = json.load(f)
 
-all_cells = []
-for f in sorted(exports.glob('narrow_scan_*.json')):
-    try:
-        with open(f) as fh:
-            data = json.load(fh)
-            if isinstance(data, list):
-                all_cells.extend(data)
-    except:
-        pass
+# Extract all active EARFCNs
+all_earfcns = []
+for op, info in data.items():
+    all_earfcns.extend(info['earfcns'])
 
-# Extract unique EARFCNs
-earfcns = list(set([c['earfcn'] for c in all_cells if 'earfcn' in c]))
-print(json.dumps(earfcns))
-"
-}
+print(json.dumps(sorted(set(all_earfcns))))
+")
 
-# Function to check if range has any cells in previous scan
+echo "Active EARFCNs in cache: $ACTIVE_EARFCNS"
+echo ""
+
+# Function to check if range has any cells in cache
 has_signal_in_range() {
     local start=$1
     local end=$2
-    local previous_earfcns="$3"
+    local cache_earfcns="$3"
     
-    echo "$previous_earfcns" | python3 -c "
+    echo "$cache_earfcns" | python3 -c "
 import json
 import sys
 
@@ -89,17 +92,17 @@ scan_operator() {
     local operator="$1"
     local earfcn_start="$2"
     local earfcn_end="$3"
-    local previous_earfcns="$4"
+    local cache_earfcns="$4"
     
-    # Check if this range has any signals in previous scans
+    # Check if this range has any cells in cache
     local has_signal
-    has_signal=$(has_signal_in_range "$earfcn_start" "$earfcn_end" "$previous_earfcns")
+    has_signal=$(has_signal_in_range "$earfcn_start" "$earfcn_end" "$cache_earfcns")
     
     if [ "$has_signal" = "false" ]; then
         echo "----------------------------------------"
         echo "SKIPPING: ${operator}"
         echo "  EARFCN Range: ${earfcn_start}-${earfcn_end}"
-        echo "  Reason: No signal detected in previous scans"
+        echo "  Reason: No signal in cache"
         echo "----------------------------------------"
         return 0
     fi
@@ -135,13 +138,8 @@ for op in operators:
     print(f\"{op['operator']}={op['earfcn_start']} {op['earfcn_end']}\")
 ")
 
-# Load previous scan results
-PREVIOUS_EARFCNS=$(load_previous_results)
-
 # Main execution
 echo "Starting Smart Band 8 scan..."
-echo ""
-echo "Previous scan found cells at EARFCNs: $PREVIOUS_EARFCNS"
 echo ""
 
 SCAN_COUNT=0
@@ -151,17 +149,17 @@ while IFS='=' read -r operator ranges; do
     read -r start end <<< "$ranges"
     
     # Check if range has signals
-    has_signal=$(has_signal_in_range "$start" "$end" "$PREVIOUS_EARFCNS")
+    has_signal=$(has_signal_in_range "$start" "$end" "$ACTIVE_EARFCNS")
     
     if [ "$has_signal" = "true" ]; then
-        scan_operator "$operator" "$start" "$end" "$PREVIOUS_EARFCNS"
+        scan_operator "$operator" "$start" "$end" "$ACTIVE_EARFCNS"
         SCAN_COUNT=$((SCAN_COUNT + 1))
     else
         SKIP_COUNT=$((SKIP_COUNT + 1))
         echo "----------------------------------------"
         echo "SKIPPING: ${operator}"
         echo "  EARFCN Range: ${start}-${end}"
-        echo "  Reason: No signal detected in previous scans"
+        echo "  Reason: No signal in cache"
         echo "----------------------------------------"
     fi
 done <<< "$OPERATOR_DATA"
