@@ -4,6 +4,11 @@
 # Scans only EARFCN segments that have signals in cache
 # Not operator-level skip, but segment-level skip
 #
+# Usage:
+#   ./scripts/smart_scan_band8.sh              # Use existing cache
+#   ./scripts/smart_scan_band8.sh --refresh    # Re-scan all ranges, update cache
+#   ./scripts/smart_scan_band8.sh --invalidate # Clear cache, then scan all
+#
 
 set -e
 
@@ -17,9 +22,21 @@ CLI="python3 -m src.cli.main scan --format json"
 
 # Scan parameters
 GAIN=42
-TIMEOUT=60  # Increased timeout per chunk
+TIMEOUT=60
 FRAMES=5
-CHUNK_SIZE=10  # Scan in 10-EARFCN segments
+CHUNK_SIZE=10
+
+# Check for flags
+REFRESH_CACHE=false
+INVALIDATE_CACHE=false
+
+if [ "$1" = "--refresh" ]; then
+    REFRESH_CACHE=true
+    echo "Mode: Refresh cache (re-scan all ranges)"
+elif [ "$1" = "--invalidate" ]; then
+    INVALIDATE_CACHE=true
+    echo "Mode: Invalidate cache (clear and re-scan all)"
+fi
 
 echo "========================================"
 echo "  Smart Band 8 Scan (Chunk Mode)"
@@ -32,11 +49,46 @@ echo "  Frames: ${FRAMES}"
 echo "  Chunk size: ${CHUNK_SIZE} EARFCNs"
 echo ""
 
-# Check if cache exists
+# Cache file
 CACHE_FILE="data/smart_scan_cache.json"
+
+# Handle invalidate mode
+if [ "$INVALIDATE_CACHE" = true ]; then
+    echo "Invalidating cache..."
+    if [ -f "$CACHE_FILE" ]; then
+        rm "$CACHE_FILE"
+        echo "  Cache cleared: $CACHE_FILE"
+    else
+        echo "  No cache to clear"
+    fi
+    echo "Running full scan to rebuild cache..."
+    echo ""
+    # Run full scan
+    ./scripts/scan_band8_by_operator.sh
+    echo ""
+    echo "Updating cache..."
+    ./scripts/init_scan_cache.sh
+    echo ""
+    echo "Cache refreshed. Run without --invalidate flag for normal smart scan."
+    exit 0
+fi
+
+# Handle refresh mode - force re-scan all ranges
+if [ "$REFRESH_CACHE" = true ]; then
+    echo "Forcing full re-scan..."
+    ./scripts/scan_band8_by_operator.sh
+    echo ""
+    echo "Updating cache..."
+    ./scripts/init_scan_cache.sh
+    echo ""
+fi
+
+# Check if cache exists
 if [ ! -f "$CACHE_FILE" ]; then
     echo "ERROR: Cache file not found: $CACHE_FILE"
-    echo "Please run ./scripts/init_scan_cache.sh first"
+    echo "Please run one of:"
+    echo "  ./scripts/smart_scan_band8.sh --invalidate  # Full scan + rebuild cache"
+    echo "  ./scripts/init_scan_cache.sh                 # Build from exports/"
     exit 1
 fi
 
@@ -188,6 +240,8 @@ echo "  - Operators skipped: ${SKIP_COUNT}"
 echo "  - Chunks scanned: ${SCANNED_CHUNKS}/${TOTAL_CHUNKS}"
 echo "  - Skip rate: $(( (TOTAL_CHUNKS - SCANNED_CHUNKS) * 100 / TOTAL_CHUNKS ))%"
 echo ""
-echo "  Example: If Telkomsel has 10 chunks but only 2 have signals,"
-echo "           we skip 8 chunks (80% skip rate)"
+echo "Usage:"
+echo "  ./scripts/smart_scan_band8.sh              # Use cache (default)"
+echo "  ./scripts/smart_scan_band8.sh --refresh    # Re-scan all ranges"
+echo "  ./scripts/smart_scan_band8.sh --invalidate # Clear cache & re-scan all"
 echo ""
