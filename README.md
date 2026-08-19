@@ -689,6 +689,48 @@ XL/Indosat not detected (signal too weak or BTS far)
 
 ---
 
+## Smart Band 8 Scan Scripts
+
+Legacy shell scripts for direct srsRAN cell searching (before Python CLI wrapper).
+
+### Available Scripts
+
+| Script | Status | Time | Notes |
+|--------|--------|------|-------|
+| `smart_scan_band8.sh` | ✅ Working | Cache-based | Original with retry mechanism |
+| `smart_scan_v5.sh` | ⚠️ Legacy | ~1m 4s | Two-step with rtl_power (redundant) |
+| **`smart_scan_v6.sh`** | **✅ RECOMMENDED** | **~1m** | **Fast direct scan, no rtl_power** |
+
+### Usage
+
+```bash
+# Fastest method (recommended)
+./scripts/smart_scan_v6.sh
+
+# With cache/retry (slower but more thorough)
+./scripts/smart_scan_band8.sh
+./scripts/smart_scan_band8.sh --retry
+./scripts/smart_scan_band8.sh --refresh
+```
+
+### Output Files
+
+Results are saved in `exports/`:
+- `smart_scan_v6_*.cells.json` - Cell discovery results
+- `smart_scan_v6_*.log` - Detailed scan log
+- `spectrum_quick_*.json` - Spectrum overview (v5 only)
+
+### How It Works
+
+1. **Step 1**: rtl_power spectrum check (optional, for visualization)
+2. **Step 2**: Direct srsRAN cell_search per operator EARFCN range
+   - Telkomsel: EARFCN 3450-3549
+   - Indosat: EARFCN 3550-3649
+   - XL: EARFCN 3650-3749
+   - Smartfren: EARFCN 3750-3799
+
+---
+
 ## License
 
 MIT
